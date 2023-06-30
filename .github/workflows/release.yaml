@@ -1,0 +1,50 @@
+name: Release
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the main branch
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+' # Push events to any matching semantic tag. For example, 1.10.1 or 2.0.0.
+        # For more details, see https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#filter-pattern-cheat-sheet
+      # and https://docs.npmjs.com/about-semantic-versioning
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+      - name: ENV
+        run: |
+          echo "REPO_NAME=${{ github.event.repository.name }}" >> $GITHUB_ENV
+          echo "TAG=${GITHUB_REF##*/}" >> $GITHUB_ENV
+      - uses: tercen/actions/start-tercen@main
+      #- name: Check open port
+      #  run: bash wait_conn.sh 127.0.0.1 5400
+      - name: Install client dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install --force  -r requirements.txt
+          pip3 install unittest2
+      - name: Run UnitTests
+        run: python3 -m unittest unittests/test*
+      - name: Build changelog
+        id: Changelog
+        uses: tercen/generate-changelog-action@master
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: ${{steps.Changelog.outputs.changelog}}
+          draft: false
+          prerelease: false

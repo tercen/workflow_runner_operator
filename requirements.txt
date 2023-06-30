@@ -1,0 +1,6 @@
+numpy==1.23.*
+pandas==1.1.*
+python-dateutil==2.8.*
+pytz==2022.*
+git+https://github.com/tercen/tercen_python_client@0.6.2
+git+https://github.com/tercen/pytson@1.7.6

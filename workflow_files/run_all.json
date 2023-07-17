@@ -1,6 +1,14 @@
 {
     "runMode":"all",
-    "workflowId":"be55b66517bf9e5663a68bac18002d65",
+    "workflowId":"57cffa7f7a5cfd889a797ae40005206d",
     "version":"0.0.1",
-    "outputArtifact":"run_all_report.json"
+    "updateOnSuccess":"True",
+    "outputArtifact":"run_all_report.json",
+    "tolerance":0.02,
+    "operators":[{
+        "stepId":"aa8c7245-7213-44cd-8d9e-cc651fde3982",
+        "operatorURL":"https://github.com/tercen/mean_operator",
+        "version":"1.1.0"
+    }]
+
 }

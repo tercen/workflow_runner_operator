@@ -71,6 +71,53 @@ def compare_column_names(colNames, refColNames):
 
     return results
 
+def update_operators(workflow, operatorList, ctx):
+    installedOperators = ctx.context.client.documentService.findOperatorByOwnerLastModifiedDate('test', '')
+
+    # Gets the required operators for the update (install them if necessary)
+    for op in operatorList:
+        opTag = '{}@{}'.format(op["operatorURL"], op["version"])
+        comp = [opTag ==  '{}@{}'.format(iop.url.uri, iop.version) for iop in installedOperators]
+
+        if not np.any(comp):
+            # install the operator
+            print("Installing {}".format(opTag))
+            installTask = CreateGitOperatorTask()
+            installTask.state = InitState()
+            installTask.url.uri = op["operatorURL"]
+            installTask.version = op["version"]
+            installTask.testRequired = False
+            installTask.isDeleted = False
+            installTask.owner = 'test'
+
+            installTask = ctx.context.client.taskService.create(installTask)
+            ctx.context.client.taskService.runTask(installTask.id)
+            installTask = ctx.context.client.taskService.waitDone(installTask.id)
+
+            operator = ctx.context.client.operatorService.get(installTask.operatorId)
+        else:
+            operator = installedOperators[which(comp)]
+
+        stpIdx = which([op["stepId"] == stp.id for stp in refWorkflow.steps])
+        workflow.steps[stpIdx].model.operatorSettings.operatorRef.operatorId = operator.id
+        workflow.steps[stpIdx].model.operatorSettings.operatorRef.url = operator.url
+        workflow.steps[stpIdx].model.operatorSettings.operatorRef.version = operator.version
+    
+    return workflow
+
+def run_workflow(workflow, project, ctx):
+    # RUN the CLONED workflow 
+    runTask = RunWorkflowTask()
+    runTask.state = InitState()
+    runTask.workflowId = workflow.id
+    runTask.workflowRev = workflow.rev
+    runTask.owner = project.acl.owner
+    runTask.projectId = project.id
+
+    runTask = ctx.context.client.taskService.create(obj=runTask)
+    ctx.context.client.taskService.runTask(taskId=runTask.id)
+    runTask = ctx.context.client.taskService.waitDone(taskId=runTask.id)
+
 if __name__ == '__main__':
     print( "Running Workflow tests")
 
@@ -114,36 +161,8 @@ if __name__ == '__main__':
     workflow.id = ''
     
 
-    installedOperators = ctx.context.client.documentService.findOperatorByOwnerLastModifiedDate('test', '')
 
-    # Gets the required operators for the update (install them if necessary)
-    for op in operatorList:
-        opTag = '{}@{}'.format(op["operatorURL"], op["version"])
-        comp = [opTag ==  '{}@{}'.format(iop.url.uri, iop.version) for iop in installedOperators]
-
-        if not np.any(comp):
-            # install the operator
-            print("Installing {}".format(opTag))
-            installTask = CreateGitOperatorTask()
-            installTask.state = InitState()
-            installTask.url.uri = op["operatorURL"]
-            installTask.version = op["version"]
-            installTask.testRequired = False
-            installTask.isDeleted = False
-            installTask.owner = 'test'
-
-            installTask = ctx.context.client.taskService.create(installTask)
-            ctx.context.client.taskService.runTask(installTask.id)
-            installTask = ctx.context.client.taskService.waitDone(installTask.id)
-
-            operator = ctx.context.client.operatorService.get(installTask.operatorId)
-        else:
-            operator = installedOperators[which(comp)]
-
-        stpIdx = which([op["stepId"] == stp.id for stp in refWorkflow.steps])
-        workflow.steps[stpIdx].model.operatorSettings.operatorRef.operatorId = operator.id
-        workflow.steps[stpIdx].model.operatorSettings.operatorRef.url = operator.url
-        workflow.steps[stpIdx].model.operatorSettings.operatorRef.version = operator.version
+    workflow = update_operators(workflow, operatorList, ctx)
 
     for stp in workflow.steps[1:]:
         stp.state.taskState = InitState()
@@ -185,17 +204,8 @@ if __name__ == '__main__':
     # =========================================================================
 
 
-    # RUN the CLONED workflow 
-    runTask = RunWorkflowTask()
-    runTask.state = InitState()
-    runTask.workflowId = workflow.id
-    runTask.workflowRev = workflow.rev
-    runTask.owner = project.acl.owner
-    runTask.projectId = project.id
 
-    runTask = ctx.context.client.taskService.create(obj=runTask)
-    ctx.context.client.taskService.runTask(taskId=runTask.id)
-    runTask = ctx.context.client.taskService.waitDone(taskId=runTask.id)
+    run_workflow(workflow, project, ctx)
     # END of Worfklow run
 
 
@@ -352,4 +362,16 @@ if __name__ == '__main__':
 
 
     ctx.context.client.workflowService.delete(workflow.id, workflow.rev)
+
+    if workflowInfo["updateOnSuccess"] == "True" and len(resultDict) == 0:
+        print("Updating reference workflow")
+        refWorkflow = update_operators(refWorkflow, operatorList, ctx)
+        for stp in refWorkflow.steps[1:]:
+            stp.state.taskState = InitState()
+        
+
+        ctx.context.client.workflowService.update(refWorkflow)
+        run_workflow(refWorkflow, project, ctx)
+        
+
     print(resultDict)

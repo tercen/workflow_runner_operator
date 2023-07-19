@@ -164,8 +164,12 @@ if __name__ == '__main__':
 
     workflow = update_operators(workflow, operatorList, ctx)
 
-    for stp in workflow.steps[1:]:
-        stp.state.taskState = InitState()
+    if hasattr(workflowInfo, "inputFile"):
+        for stp in workflow.steps[1:]:
+            stp.state.taskState = InitState()
+    else:
+        for stp in workflow.steps:
+            stp.state.taskState = InitState()
 
     # Create the new workflow with the required changes
     workflow = ctx.context.client.workflowService.create(workflow)
@@ -173,35 +177,34 @@ if __name__ == '__main__':
 
     project = ctx.context.client.projectService.get(workflow.projectId)
     
-    # =========================================================================
-    # TODO Only execute this code bit if there is an associated change in the input JSON file
-    # CHANGE the linked file in the table step
-    # tblStep = workflow.steps[0]
-    # 
-    # fileList = ctx.context.client.projectDocumentService.findProjectObjectsByFolderAndName(project.name, '')
-    
-    # for f in fileList:
-    #     #c03_simple_100_10000.tsv
-    #     if f.projectId == project.id and f.name == 'Crabs Data.csv':
-    #     # if f.projectId == project.id and f.name == 'c03_simple_100_10000.tsv': 
-    #         wkfFile = f
 
-    # fSchema = ctx.context.client.tableSchemaService.get(wkfFile.id, useFactory=True)
-    
-    # rr = RenameRelation()
-    # rr.inNames = [f.name for f in fSchema.columns]
-    # rr.outNames = [f.name for f in fSchema.columns]
-    # rr.relation = SimpleRelation()
-    # rr.relation.id = fSchema.id
+    if hasattr(workflowInfo, "inputFile"):
+        # =========================================================================
+        # CHANGE the linked file in the table step
+        tblStep = workflow.steps[0]
+        fileList = ctx.context.client.projectDocumentService.findProjectObjectsByFolderAndName(project.name, '')
+        
+        for f in fileList:
+            if f.projectId == project.id and f.name == workflowInfo["inputFile"]:
+            # if f.projectId == project.id and f.name == 'c03_simple_100_10000.tsv': 
+                wkfFile = f
 
-    # tblStep.model.relation = rr
+        fSchema = ctx.context.client.tableSchemaService.get(wkfFile.id, useFactory=True)
+        
+        rr = RenameRelation()
+        rr.inNames = [f.name for f in fSchema.columns]
+        rr.outNames = [f.name for f in fSchema.columns]
+        rr.relation = SimpleRelation()
+        rr.relation.id = fSchema.id
 
-    # tblStep.state.taskState = DoneState()
+        tblStep.model.relation = rr
 
-    # workflow.steps[0] = tblStep
-    # ctx.context.client.workflowService.update(workflow)
-    # END of file selection
-    # =========================================================================
+        tblStep.state.taskState = DoneState()
+
+        workflow.steps[0] = tblStep
+        ctx.context.client.workflowService.update(workflow)
+        # END of file selection
+        # =========================================================================
 
 
 
@@ -342,7 +345,6 @@ if __name__ == '__main__':
                                          rel[w] = 9999
                                     else:
                                         rel[w] = abs(1-colVals[w]/(refColVals[w]))
-                                # rel = [abs(1-colVals[w]/(refColVals[w])) for w in range(0, len(colVals))]
                                 
 
                                 if np.any(rel > relTol):

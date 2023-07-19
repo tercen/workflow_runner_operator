@@ -5,6 +5,7 @@
     "updateOnSuccess":"True",
     "outputArtifact":"run_all_report.json",
     "tolerance":0.02,
+    "inputFile":"Crabs Data.csv",
     "operators":[{
         "stepId":"aa8c7245-7213-44cd-8d9e-cc651fde3982",
         "operatorURL":"https://github.com/tercen/mean_operator",

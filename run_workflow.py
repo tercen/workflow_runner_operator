@@ -1,17 +1,26 @@
-import os 
+import os, uuid
 import sys
 import json
+import random, string
 sys.path.append('./')
 sys.path.append('../../')
 
+
+import jsondiff
 
 from tercen.model.base import *
 from tercen.client import context as tercen
 
 import numpy as np
 from fpdf import FPDF
+from datetime import datetime
 
 import tercen.http.HttpClientService as th
+import tercen.util.helper_functions as utl
+import polars as pl
+
+
+
 
 
 def compare_column_schemas(schema, refSchema):
@@ -118,6 +127,10 @@ def run_workflow(workflow, project, ctx):
     ctx.context.client.taskService.runTask(taskId=runTask.id)
     runTask = ctx.context.client.taskService.waitDone(taskId=runTask.id)
 
+
+
+
+
 if __name__ == '__main__':
     print( "Running Workflow tests")
 
@@ -125,6 +138,8 @@ if __name__ == '__main__':
     
     conf_path = os.path.join(absPath, 'env.conf')
     json_path = os.path.join(absPath, 'workflow_files/run_all.json')
+    # json_path = os.path.join(absPath, 'workflow_files/debarcode_workflow.json')
+    # json_path = os.path.join(absPath, 'workflow_files/gather_join2.json')
 
 
     username = 'test'
@@ -157,66 +172,178 @@ if __name__ == '__main__':
     # CLONE reference workflow (but doesn't create a new one just yet)
     workflow = ctx.context.client.workflowService.copyApp(refWorkflow.id, refWorkflow.projectId)
 
-    workflow.name = "new_workflow"
+    workflow.name = "{}_{}".format(refWorkflow.name, datetime.now().strftime("%Y%m%d_%H%M%S"))
     workflow.id = ''
+
+    # NOT THE ISSUE
+    for lnk in workflow.links:
+        lnk.id = str(uuid.uuid4()) 
+
     
+    # NEED to update this
+    tableStepFiles = workflowInfo["tableStepFiles"]
+    len(tableStepFiles)
+    for stp in workflow.steps:
+        oldId = stp.id
+        newId = str(uuid.uuid4())
+        stp.id = newId
+        
+
+        tblStepIdx = which([oldId == tbf["stepId"] for tbf in tableStepFiles])
+        if isinstance(tblStepIdx, int) or len(tblStepIdx) > 0:
+                tableStepFiles.append( {"stepId":stp.id, "fileId":tableStepFiles[tblStepIdx]["fileId"]} )
+
+        for k in range(0, len(stp.inputs)):
+            stp.inputs[k].id = "{}-i-{:d}".format(newId, k)
+            for lnk in workflow.links:
+                if lnk.inputId == "{}-i-{:d}".format(oldId, k):
+                    lnk.inputId = stp.inputs[k].id
+
+                
+
+        for k in range(0, len(stp.outputs)):
+            stp.outputs[k].id = "{}-o-{:d}".format(newId, k)
+            for lnk in workflow.links:
+                if lnk.outputId == "{}-o-{:d}".format(oldId, k):
+                    lnk.outputId = stp.outputs[k].id
 
 
     workflow = update_operators(workflow, operatorList, ctx)
 
-    if hasattr(workflowInfo, "inputFile"):
-        for stp in workflow.steps[1:]:
-            stp.state.taskState = InitState()
-    else:
-        for stp in workflow.steps:
-            stp.state.taskState = InitState()
+    #FIXME If nothing changes, the cached version of the computedRelation is used
+    # Not usually a problem, but then we cannot delete the new workflow if needed
+    # because it indicates a dependency to the reference workflow
+    for stp in workflow.steps:
+        if hasattr(stp, "computedRelation"):
+            #TODO Check if this factor actually exists
+            # Operators (like downsample) might ot have it
+            yFac = stp.model.axis.xyAxis[0].yAxis.graphicalFactor
+            nf = NamedFilter()
+            fe = FilterExpr()
+            fe.factor = yFac.factor
+            fe.filterOp = 'notequals'
+            fe.stringValue = '-98765456789'
+            nf.filterExprs = [fe] #FIXME
+            nf.logical = 'or'
+            nf.isNot = False
+            nf.name = yFac.factor.name
+            stp.model.filters.namedFilters.append(nf)
+            
+        
+        stp.state.taskState = InitState()
+
+    
+
+
 
     # Create the new workflow with the required changes
     workflow = ctx.context.client.workflowService.create(workflow)
-    # ctx.context.client.workflowService.update(workflow)
+    
+
 
     project = ctx.context.client.projectService.get(workflow.projectId)
     
 
-    if hasattr(workflowInfo, "inputFile"):
-        # =========================================================================
-        # CHANGE the linked file in the table step
-        tblStep = workflow.steps[0]
-        fileList = ctx.context.client.projectDocumentService.findProjectObjectsByFolderAndName(project.name, '')
+    for tbf in tableStepFiles:
         
-        for f in fileList:
-            if f.projectId == project.id and f.name == workflowInfo["inputFile"]:
-            # if f.projectId == project.id and f.name == 'c03_simple_100_10000.tsv': 
-                wkfFile = f
-
-        fSchema = ctx.context.client.tableSchemaService.get(wkfFile.id, useFactory=True)
+        tblStepIdx = which([stp.id == tbf["stepId"] for stp in workflow.steps])
+        if not (isinstance(tblStepIdx, int) or len(tblStepIdx) > 0):
+            continue
         
-        rr = RenameRelation()
-        rr.inNames = [f.name for f in fSchema.columns]
-        rr.outNames = [f.name for f in fSchema.columns]
-        rr.relation = SimpleRelation()
-        rr.relation.id = fSchema.id
+        try:
+            fileDoc = ctx.context.client.projectDocumentService.get(tbf["fileId"])
 
-        tblStep.model.relation = rr
+            isRefRel = False
+            if fileDoc.nRows == 0:
+                fSchema = ctx.context.client.tableSchemaService.get(fileDoc.relation.id, useFactory=True)
+                isRefRel = True
+            else:
+                fSchema = fileDoc
 
-        tblStep.state.taskState = DoneState()
+            rr = RenameRelation()
+            rr.inNames = [f.name for f in fSchema.columns]
+            rr.inNames.append("{}._rids".format(fSchema.id))
+            rr.inNames.append("{}.tlbId".format(fSchema.id))
+            rr.outNames = [f.name for f in fSchema.columns]
+            rr.outNames.append("rowId")
+            rr.outNames.append("tableId")
 
-        workflow.steps[0] = tblStep
-        ctx.context.client.workflowService.update(workflow)
-        # END of file selection
-        # =========================================================================
+            if isRefRel == True:
+                rr.relation = ReferenceRelation()
+                rr.relation.relation = SimpleRelation()
+                rr.relation.id = fileDoc.id #fSchema.id
+                rr.relation.relation.id = fSchema.id
+                rr.id = "rename_{}".format(fileDoc.id)
+            else:
+                rr.relation = SimpleRelation()
+                rr.relation.id = fileDoc.id #fSchema.id
+                rr.id = "rename_{}".format(fileDoc.id)
+        except:
+            # If the file is used as an object (not the table operator) there will be no schema
+            # So we build a dataframe with the documentId
+            df = pl.DataFrame({"documentId":tbf["fileId"]})
+            rr = InMemoryRelation()
+            rr.inMemoryTable = utl.dataframe_to_table(df)[0]
+            
+
+        workflow.steps[tblStepIdx].model.relation = rr
+
+        workflow.steps[tblStepIdx].state.taskState = DoneState()
+
+    # Check and select Gather steps
+    # Change the following ids
+    # In table step, the rename id in model must match the relation id
+    # The gather step must refer to this new id
+    tableIdMaps = {}
+    joinLinkMaps = {}
+    for i in range(0, len(workflow.steps)):
+        stp = workflow.steps[i]
+        refStp = refWorkflow.steps[i]
+
+        if hasattr(stp.model, "relation") and hasattr(stp.model.relation, "relation"):
+            tableIdMaps[refStp.model.relation.id] = i
+            stp.model.relation.id = "{}".format(stp.model.relation.id)
+            
+
+    # For gather steps, find the reference relation id, and use the new id
+    for i in range(0, len(workflow.steps)):
+        # refStp = refWorkflow.steps[i]
+        stp = workflow.steps[i]
+        if isinstance(stp, MeltStep):
+            
+            for k in range(0, len(stp.meltedAttributes)):
+                ma = stp.meltedAttributes[k]
+                tableStp = workflow.steps[tableIdMaps[ma.relationId]]
+                stp.meltedAttributes[k].relationId = tableStp.model.relation.id
+                
+        if isinstance(stp, JoinStep):
+            for k in range(0, len(stp.rightAttributes)):
+                ma = stp.rightAttributes[k]
+                if not ma.relationId == '':
+                    tableStp = workflow.steps[tableIdMaps[ma.relationId]]
+                    stp.rightAttributes[k].relationId = tableStp.model.relation.id
+
+
+
+    ctx.context.client.workflowService.update(workflow)
+
 
 
 
     run_workflow(workflow, project, ctx)
     # END of Worfklow run
+    
 
-
-    # TODO Create run report regardless of differences in execution result
-
-    # Get the updated workflow (NOTE: Might be unnecessary)
+    # # TODO Create run report regardless of differences in execution result
+    # # Get the updated workflow (NOTE: Might be unnecessary)
     workflow = ctx.context.client.workflowService.get(workflow.id)
 
+
+    #=======================================================================
+    # comparison
+    # res = jsondiff.diff(refWorkflow.toJson(), workflow.toJson())
+
+    # print(res)
     resultDict = {}
     relTol = workflowInfo["tolerance"]
     # BASIC Workflow info
@@ -255,22 +382,35 @@ if __name__ == '__main__':
     # resultDict["Reference_Workflow_Run_Time"] = taskTimeRef
 
 
-
-
     # START step-by-step comparison
     # NOTE Assumes the order of the steps have not changed
     #FIXME Issue #1
+
     for i in range(0, len(workflow.steps)):
         stp = workflow.steps[i]
         refStp = refWorkflow.steps[i]
 
         # NOTE TableStep comparison is likely not necessary
         if(isinstance(stp, TableStep)):
-            sch = ctx.context.client.tableSchemaService.get(stp.model.relation.id)
-            inNames = [c.name for c in sch.columns]
+            if isinstance(stp.model.relation, SimpleRelation):
+                sch = ctx.context.client.tableSchemaService.get(stp.model.relation.id)
+                inNames = [c.name for c in sch.columns]
+            elif isinstance(stp.model.relation, InMemoryRelation):
+                inNames = [c.name for c in stp.model.relation.inMemoryTable.columns]
+            else:    
+                sch = ctx.context.client.tableSchemaService.get(stp.model.relation.relation.id)
+                inNames = [c.name for c in sch.columns]
 
-            sch = ctx.context.client.tableSchemaService.get(refStp.model.relation.id)
-            refInNames = [c.name for c in sch.columns]
+            if isinstance(refStp.model.relation, SimpleRelation):
+                sch = ctx.context.client.tableSchemaService.get(refStp.model.relation.id)
+                refInNames = [c.name for c in sch.columns]
+            elif isinstance(refStp.model.relation, InMemoryRelation):
+                refInNames = [c.name for c in refStp.model.relation.inMemoryTable.columns]
+            else:    
+                sch = ctx.context.client.tableSchemaService.get(refStp.model.relation.relation.id)
+                refInNames = [c.name for c in sch.columns]
+            
+            # refInNames = [c.name for c in sch.columns]
 
 
             res = compare_column_names(inNames, refInNames)
@@ -346,7 +486,7 @@ if __name__ == '__main__':
                                     else:
                                         rel[w] = abs(1-colVals[w]/(refColVals[w]))
                                 
-
+                                
                                 if np.any(rel > relTol):
                                     tableRes["RefValues"] = refColVals
                                     tableRes["Values"] = colVals
@@ -365,15 +505,16 @@ if __name__ == '__main__':
 
     ctx.context.client.workflowService.delete(workflow.id, workflow.rev)
 
-    if workflowInfo["updateOnSuccess"] == "True" and len(resultDict) == 0:
-        print("Updating reference workflow")
-        refWorkflow = update_operators(refWorkflow, operatorList, ctx)
-        for stp in refWorkflow.steps[1:]:
-            stp.state.taskState = InitState()
+    # TODO remove reference and rename new workflow
+    # if workflowInfo["updateOnSuccess"] == "True" and len(resultDict) == 0:
+    #     print("Updating reference workflow")
+    #     refWorkflow = update_operators(refWorkflow, operatorList, ctx)
+    #     for stp in refWorkflow.steps[1:]:
+    #         stp.state.taskState = InitState()
         
 
-        ctx.context.client.workflowService.update(refWorkflow)
-        run_workflow(refWorkflow, project, ctx)
+    #     ctx.context.client.workflowService.update(refWorkflow)
+    #     run_workflow(refWorkflow, project, ctx)
         
 
     print(resultDict)

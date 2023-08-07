@@ -5,6 +5,7 @@
     "updateOnSuccess":"False",
     "outputArtifact":"run_all_report.json",
     "tolerance":0.01,
+    "verbose":"True",
     "tableStepFiles":[{
         "stepId":"49a8ccd8-7805-42be-859b-cc0eae33b386",
         "fileId":"683fcd3410959f0420e088855e00a4c8"

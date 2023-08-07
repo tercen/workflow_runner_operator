@@ -1,17 +1,16 @@
 {
     "runMode":"all",
-    "workflowId":"4efe69c80b8b82408eb5c18317034416",
+    "workflowId":"577740b6b5cc2b9f5f6f7095aa0f251d",
     "version":"0.0.1",
     "updateOnSuccess":"False",
     "outputArtifact":"run_all_report.json",
     "tolerance":0.01,
-    "verbose":"True",
     "tableStepFiles":[{
-        "stepId":"49a8ccd8-7805-42be-859b-cc0eae33b386",
+        "stepId":"9bb83e3e-7e40-47a5-983a-a52dea2a724b",
         "fileId":"683fcd3410959f0420e088855e00a4c8"
     },
-    {             
-        "stepId":"143301bf-f9c1-4549-9328-40f13d08709c",
+    {
+        "stepId":"a07074f8-99b2-4a78-85bb-69fcc3d59256",
         "fileId":"683fcd3410959f0420e088855e008f36"
     }],
     "operators":[]

@@ -5,14 +5,15 @@
     "updateOnSuccess":"False",
     "outputArtifact":"run_all_report.json",
     "tolerance":0.02,
+    "verbose":"True",
     "tableStepFiles":[{
         "stepId":"7f856005-341a-4543-a6f1-01d2c242aa45",
         "fileId":"57cffa7f7a5cfd889a797ae40005388d"
     }],
     "operators":[{
-        "stepId":"aa8c7245-7213-44cd-8d9e-cc651fde3982",
+        "stepId":"b47e85ae-76c7-469d-80f5-f19a56fb7469",
         "operatorURL":"https://github.com/tercen/mean_operator",
-        "version":"1.1.0"
+        "version":"1.2.0"
     }]
 
 }

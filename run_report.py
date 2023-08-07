@@ -7,6 +7,7 @@ sys.path.append('../../')
 
 from tercen.model.base import *
 from tercen.client import context as tercen
+import tercen.http.HttpClientService as th
 
 import numpy as np
 from fpdf import FPDF
@@ -29,6 +30,9 @@ if __name__ == '__main__':
     conf_path = os.path.join(absPath, 'env.conf')
     json_path = os.path.join(absPath, 'workflow_files/run_all.json')
 
+    workflowVersionLabel = "1.0"
+
+    outfile = 'workflow_data.json'    
 
     username = 'test'
     passw = 'test'
@@ -93,14 +97,18 @@ if __name__ == '__main__':
             pdf = add_step_result(pdf, "Columns", ''.join(stp.model.relation.inNames))
         else:
             if hasattr(stp.computedRelation, 'joinOperators'):
-                #FIXME There are no values here
-                #TODO Multiple output tables
+                #FIXME There are no values in the columns here
+                #TODO Handle multiple output tables
                 #TODO Join, Gather Steps
                 schema = ctx.context.client.tableSchemaService.get(
                     stp.computedRelation.joinOperators[0].rightRelation.relation.mainRelation.id
                 )
 
-
+                
+                # return utl.tson_to_polars(
+                th.decodeTSON(ctx.context.client.tableSchemaService.selectStream(schema.id, [".ci"], 0, -1))
+                
+        
                 colString = ''
                 for i in range(0, len(schema.columns)):
                     col = schema.columns[i]

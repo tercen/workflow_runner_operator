@@ -78,6 +78,6 @@ if __name__ == '__main__':
 
     # REtrieve the updated, ran workflow
     workflow = ctx.context.client.workflowService.get(workflow.id)
-    resultDict = diff_workflow(ctx, workflow, refWorkflow, workflowInfo["tolerance"])
+    resultDict = diff_workflow(ctx, workflow, refWorkflow, workflowInfo["tolerance"], workflowInfo["verbose"])
     print(resultDict)
-    # ctx.context.client.workflowService.delete(workflow.id, workflow.rev)
+    ctx.context.client.workflowService.delete(workflow.id, workflow.rev)

@@ -8,10 +8,11 @@ sys.path.append('../../')
 from util import msg 
 from workflow_setup import create_test_workflow, update_table_relations
 from workflow_compare import diff_workflow
+from workflow_stats import stats_workflow
 
 
 from tercen.client import context as tercen
-from tercen.model.base import RunWorkflowTask, InitState
+from tercen.model.base import RunWorkflowTask, InitState, DoneState
 
 
 def run_workflow(workflow, project, ctx):
@@ -80,4 +81,11 @@ if __name__ == '__main__':
     workflow = ctx.context.client.workflowService.get(workflow.id)
     resultDict = diff_workflow(ctx, workflow, refWorkflow, workflowInfo["tolerance"], workflowInfo["verbose"])
     print(resultDict)
+
+
+    stats =  stats_workflow(ctx, workflow, refWorkflow, verbose=False)
+    
+
+
+    print(stats)
     ctx.context.client.workflowService.delete(workflow.id, workflow.rev)

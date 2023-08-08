@@ -32,7 +32,8 @@ if __name__ == '__main__':
     absPath = os.path.dirname(os.path.abspath(__file__))
     
     conf_path = os.path.join(absPath, 'env.conf')
-    json_path = os.path.join(absPath, 'workflow_files/run_all.json')
+    # json_path = os.path.join(absPath, 'workflow_files/run_all.json')
+    json_path = os.path.join(absPath, 'workflow_files/diagnostic_plot.json')
     # json_path = os.path.join(absPath, 'workflow_files/debarcode_workflow.json')
     # json_path = os.path.join(absPath, 'workflow_files/gather_join2.json')
     

@@ -114,13 +114,24 @@ def compare_step(ctx, stp, refStp, relTol=0, verbose=False):
                     jop = joinOps[k]
                     refJop = refJoinOps[k]
 
-                    schema = ctx.context.client.tableSchemaService.get(
-                        jop.rightRelation.relation.mainRelation.id
-                    )
+                    if isinstance(jop.rightRelation, SimpleRelation):
+                        schema = ctx.context.client.tableSchemaService.get(
+                            jop.rightRelation.id
+                        )
+                        
+                    else:
+                        schema = ctx.context.client.tableSchemaService.get(
+                            jop.rightRelation.relation.mainRelation.id
+                        )
 
-                    refSchema = ctx.context.client.tableSchemaService.get(
-                        refJop.rightRelation.relation.mainRelation.id
-                    )
+                    if isinstance(refJop.rightRelation, SimpleRelation):
+                        refSchema = ctx.context.client.tableSchemaService.get(
+                            refJop.rightRelation.id
+                        )
+                    else:
+                        refSchema = ctx.context.client.tableSchemaService.get(
+                            refJop.rightRelation.relation.mainRelation.id
+                        )
 
                     # Compare schemas
                     refColNames = [c.name for c in refSchema.columns]
@@ -158,17 +169,32 @@ def compare_step(ctx, stp, refStp, relTol=0, verbose=False):
                                     type(colVals[0]) 
                                 )
 
+                            def isnumeric(val):
+                               return isinstance(val, int) or isinstance(val, float)
+                            testEqualityOnly = False
+                            if not isnumeric(col["columns"][0]["values"]) or not isnumeric(refCol["columns"][0]["values"]):
+                                testEqualityOnly = True
 
-                            colVals = col["columns"][0]["values"].astype(float)
-                            refColVals = refCol["columns"][0]["values"].astype(float)
+
+                            if isnumeric(col["columns"][0]["values"]):
+                                colVals = col["columns"][0]["values"].astype(float)
+                            if isnumeric(refCol["columns"][0]["values"]):
+                                refColVals = refCol["columns"][0]["values"].astype(float)
+
                             rel = np.zeros((len(colVals)))
                             for w in range(0, len(colVals)):
-                                if refColVals[w] == 0 and colVals[w] == 0:
-                                    rel[w] = 0
-                                elif (refColVals[w] == 0 and colVals[w] != 0) or (refColVals[w] != 0 and colVals[w] == 0):
-                                        rel[w] = 9999
+                                if testEqualityOnly:
+                                    if refColVals[w] == colVals[w]:
+                                        rel[w] = 0
+                                    else:
+                                        rel[w] = 1
                                 else:
-                                    rel[w] = abs(1-colVals[w]/(refColVals[w]))
+                                    if refColVals[w] == 0 and colVals[w] == 0:
+                                        rel[w] = 0
+                                    elif (refColVals[w] == 0 and colVals[w] != 0) or (refColVals[w] != 0 and colVals[w] == 0):
+                                            rel[w] = 9999
+                                    else:
+                                        rel[w] = abs(1-colVals[w]/(refColVals[w]))
                             
                             
                             if np.any(rel > relTol):

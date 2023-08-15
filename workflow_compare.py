@@ -52,7 +52,7 @@ def compare_columns_metadata(colNames, refColNames):
 
 
 
-def compare_step(ctx, stp, refStp, relTol=0, verbose=False):
+def compare_step(ctx, stp, refStp, tol=0, tolType="absolute", verbose=False):
     stepResult = {}
     # NOTE Possibly unnecessary, but input data might change
     if(isinstance(stp, TableStep)):
@@ -183,12 +183,15 @@ def compare_step(ctx, stp, refStp, relTol=0, verbose=False):
 
                             rel = np.zeros((len(colVals)))
                             for w in range(0, len(colVals)):
-                                if testEqualityOnly:
+                                if testEqualityOnly or tolType == "equality":
                                     if refColVals[w] == colVals[w]:
                                         rel[w] = 0
                                     else:
                                         rel[w] = 1
+                                elif tolType == "absolute":
+                                    rel[w] = abs(refColVals[w]-colVals[w])
                                 else:
+
                                     if refColVals[w] == 0 and colVals[w] == 0:
                                         rel[w] = 0
                                     elif (refColVals[w] == 0 and colVals[w] != 0) or (refColVals[w] != 0 and colVals[w] == 0):
@@ -197,13 +200,13 @@ def compare_step(ctx, stp, refStp, relTol=0, verbose=False):
                                         rel[w] = abs(1-colVals[w]/(refColVals[w]))
                             
                             
-                            if np.any(rel > relTol):
+                            if np.any(rel > tol):
                                 colResult = {
                                     "RefColName":refColNames[ci],
                                     "ColName":colNames[ci],
                                     "RefValues":refColVals,
                                     "Values":colVals,
-                                    "OutOfRangeIdx":which(rel > relTol),
+                                    "OutOfRangeIdx":which(rel > tol),
                                     "CompResult":rel
                                 }
                                 if hasattr(tableRes, "ColumnResults"):
@@ -213,7 +216,7 @@ def compare_step(ctx, stp, refStp, relTol=0, verbose=False):
 
                                 # tableRes["RefValues"] = refColVals
                                 # tableRes["Values"] = colVals
-                                # tableRes["OutOfRangeIdx"] = which(rel > relTol)
+                                # tableRes["OutOfRangeIdx"] = which(rel > tol)
                                 # tableRes["CompResult"] = rel
                                 hasDiff = True
                                 
@@ -226,13 +229,13 @@ def compare_step(ctx, stp, refStp, relTol=0, verbose=False):
                         stepResult = {**stepResult, **tableRes}
     return stepResult
 
-def diff_workflow(ctx, workflow, refWorkflow, relTol=0, verbose=False):
+def diff_workflow(ctx, workflow, refWorkflow, tol=0, tolType="absolute", verbose=False):
     resultDict = {}
     for i in range(0, len(workflow.steps)):
         stp = workflow.steps[i]
         refStp = refWorkflow.steps[i]
 
-        stepRes = compare_step(ctx, stp, refStp, relTol, verbose)
+        stepRes = compare_step(ctx, stp, refStp, tol, tolType, verbose)
         resultDict = {**resultDict, **stepRes}
         # NOTE TableStep comparison is likely not necessary
         

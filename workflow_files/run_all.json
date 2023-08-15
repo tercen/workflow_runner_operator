@@ -4,6 +4,7 @@
     "version":"0.0.1",
     "updateOnSuccess":"False",
     "outputArtifact":"run_all_report.json",
+    "toleranceType":"absolute",
     "tolerance":0.02,
     "verbose":"True",
     "tableStepFiles":[{

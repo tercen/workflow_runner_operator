@@ -1,5 +1,6 @@
 import sys
-
+import polars as pl
+import numpy as np
 sys.path.append('./')
 sys.path.append('../../')
 
@@ -11,7 +12,22 @@ import numpy as np
 
 import tercen.http.HttpClientService as th
 
+def isnumeric(val):
+    return isinstance(val, int) or isinstance(val, float)
 
+
+def polarDtype_to_numpyDtype(plType):
+    npDtype = None
+    if plType == pl.Float64:
+        npDtype = np.float64
+
+    if plType == pl.Int64:
+        npDtype = np.int64
+
+    if plType == pl.Int32:
+        npDtype = np.int32
+
+    return npDtype
 
 def compare_columns_metadata(colNames, refColNames):
     results = {}
@@ -49,33 +65,53 @@ def compare_columns_metadata(colNames, refColNames):
 
     return results
 
-def compare_table(ctx,jop, refJop, tol=0, tolType="Absolute"):
+def compare_table(client,jop, refJop, referenceSchemaPath, tol=0, tolType="Absolute"):
     tableRes = {}
     hasDiff = False
-    # jop = joinOps[k]
-    # refJop = refJoinOps[k]
+
 
     if isinstance(jop.rightRelation, SimpleRelation):
-        schema = ctx.context.client.tableSchemaService.get(
+        schema = client.tableSchemaService.get(
             jop.rightRelation.id
         )
         
     else:
-        schema = ctx.context.client.tableSchemaService.get(
+        schema = client.tableSchemaService.get(
             jop.rightRelation.relation.mainRelation.id
         )
 
+        
+        # if isinstance(refStp.model.relation, SimpleRelation):
+        #     #sch = client.tableSchemaService.get(refStp.model.relation.id)
+            
+        #     tbl = pl.read_csv("{}/{}/data.csv".format(referenceSchemaPath, refStp.model.relation.id) )
+        #     refInNames = [c for c in tbl.columns]
+
+        # elif isinstance(refStp.model.relation, InMemoryRelation):
+        #     #refInNames = [c.name for c in refStp.model.relation.inMemoryTable.columns]
+        #     # TODO Check if this ever occurs in an exported workflow
+        #     tbl = pl.read_csv("{}/{}/data.csv", referenceSchemaPath, refStp.model.relation.id)            
+        #     refInNames = [c for c in tbl.columns]
+        # else:    
+        #     #sch = client.tableSchemaService.get(refStp.model.relation.relation.id)
+        #     #refInNames = [c.name for c in sch.columns]
+        #     tbl = pl.read_csv("{}/{}/data.csv".format(referenceSchemaPath, refStp.model.relation.relation.id) )
+        #     refInNames = [c for c in tbl.columns]
+
+
     if isinstance(refJop.rightRelation, SimpleRelation):
-        refSchema = ctx.context.client.tableSchemaService.get(
-            refJop.rightRelation.id
-        )
+        refTbl = pl.read_csv("{}/{}/data.csv".format( referenceSchemaPath, refJop.rightRelation.id))
+        # refSchema = client.tableSchemaService.get(
+        #     refJop.rightRelation.id
+        # )
     else:
-        refSchema = ctx.context.client.tableSchemaService.get(
-            refJop.rightRelation.relation.mainRelation.id
-        )
+        refTbl = pl.read_csv("{}/{}/data.csv".format( referenceSchemaPath, refJop.rightRelation.relation.mainRelation.id))
+        # refSchema = client.tableSchemaService.get(
+        #     refJop.rightRelation.relation.mainRelation.id
+        # )
 
     # Compare schemas
-    refColNames = [c.name for c in refSchema.columns]
+    refColNames = [c for c in refTbl.columns]
     colNames = [c.name for c in schema.columns]
     res = compare_columns_metadata(colNames, refColNames)
 
@@ -83,12 +119,12 @@ def compare_table(ctx,jop, refJop, tol=0, tolType="Absolute"):
         tableRes = {**tableRes, **res}
         hasDiff = True
 
-    if schema.nRows != refSchema.nRows:
+    if schema.nRows != refTbl.shape[0]:
         hasDiff = True
         #TODO Try to get table name here... 
         tableRes["NumRows"] = "Number rows tables do not match for Table {:d} : {:d} x {:d} (Reference vs Workflow)".format(
             1, #k + 1,
-            refSchema.nRows,
+            refTbl.shape[0],
             schema.nRows 
         )
     else:
@@ -98,30 +134,45 @@ def compare_table(ctx,jop, refJop, tol=0, tolType="Absolute"):
         
         for ci in range(0, len(colNames)):
             msg("Comparing {} against {}".format(colNames[ci], colNames[ci]))
-            col = th.decodeTSON(ctx.context.client.tableSchemaService.selectStream(schema.id, [colNames[ci]], 0, -1))
+            col = th.decodeTSON(client.tableSchemaService.selectStream(schema.id, [colNames[ci]], 0, -1))
             colVals = col["columns"][0]["values"]
-            refCol = th.decodeTSON(ctx.context.client.tableSchemaService.selectStream(refSchema.id, [refColNames[ci]], 0, -1))
-            refColVals = refCol["columns"][0]["values"]
+            #refCol = th.decodeTSON(ctx.context.client.tableSchemaService.selectStream(refSchema.id, [refColNames[ci]], 0, -1))
+            #refColVals = refCol["columns"][0]["values"]
+            refColVals = refTbl[:,ci]
+            refColType = polarDtype_to_numpyDtype(refTbl.dtypes[ci])
 
-            if type(colVals[0]) != type(refColVals[0]):
-                tableRes["ColType"] = "Column tables do not match for Table {:d}, column {:d} : {:d} x {:d} (Reference vs Workflow)".format(
-                    k + 1,
-                    ci + 1,
-                    type(refColVals[0]),
-                    type(colVals[0]) 
-                )
 
-            def isnumeric(val):
-                return isinstance(val, int) or isinstance(val, float)
+            
+            if type(colVals[0]) != refColType:
+                hasDiff = True
+                k = 0 # FIXME Receive the table index for reporting here
+                print(hasattr(tableRes, "ColType"))
+                if  "ColType" in tableRes:
+                    
+                    tableRes["ColType"].append( "Column tables do not match for Table {:d}, column {:d} : {} x {} (Reference vs Workflow)".format(
+                        k + 1,
+                        ci + 1,
+                        refColType,
+                        type(colVals[0]) 
+                    ))
+                else:
+                    tableRes["ColType"] = ["Column tables do not match for Table {:d}, column {:d} : {} x {} (Reference vs Workflow)".format(
+                        k + 1,
+                        ci + 1,
+                        refColType,
+                        type(colVals[0]) 
+                    )]
+
+            
             testEqualityOnly = False
-            if not isnumeric(col["columns"][0]["values"]) or not isnumeric(refCol["columns"][0]["values"]):
+            if not isnumeric(col["columns"][0]["values"]) or not isnumeric(refColVals):
                 testEqualityOnly = True
 
 
             if isnumeric(col["columns"][0]["values"]):
                 colVals = col["columns"][0]["values"].astype(float)
-            if isnumeric(refCol["columns"][0]["values"]):
-                refColVals = refCol["columns"][0]["values"].astype(float)
+            if isnumeric(refColVals):
+                refColVals = refColVals.astype(float)
 
             rel = np.zeros((len(colVals)))
             for w in range(0, len(colVals)):
@@ -157,32 +208,44 @@ def compare_table(ctx,jop, refJop, tol=0, tolType="Absolute"):
                     tableRes["ColumnResults"] = [colResult]
 
                 hasDiff = True
+    
     return [tableRes, hasDiff]
     
 
 #FIXME Not comparing Gather and Join steps at the moment
-def compare_step(ctx, stp, refStp, tol=0, tolType="absolute", tableComp=[], verbose=False):
+def compare_step(client, stp, refStp, referenceSchemaPath, tol=0, tolType="absolute", tableComp=[], verbose=False):
     stepResult = {}
     # NOTE Possibly unnecessary, but input data might change
     if(isinstance(stp, TableStep)):
 
         if isinstance(stp.model.relation, SimpleRelation):
-            sch = ctx.context.client.tableSchemaService.get(stp.model.relation.id)
+            sch = client.tableSchemaService.get(stp.model.relation.id)
             inNames = [c.name for c in sch.columns]
         elif isinstance(stp.model.relation, InMemoryRelation):
             inNames = [c.name for c in stp.model.relation.inMemoryTable.columns]
         else:    
-            sch = ctx.context.client.tableSchemaService.get(stp.model.relation.relation.id)
+            sch = client.tableSchemaService.get(stp.model.relation.relation.id)
             inNames = [c.name for c in sch.columns]
 
+
+        
         if isinstance(refStp.model.relation, SimpleRelation):
-            sch = ctx.context.client.tableSchemaService.get(refStp.model.relation.id)
-            refInNames = [c.name for c in sch.columns]
+            #sch = client.tableSchemaService.get(refStp.model.relation.id)
+            
+            tbl = pl.read_csv("{}/{}/data.csv".format(referenceSchemaPath, refStp.model.relation.id) )
+            refInNames = [c for c in tbl.columns]
+
         elif isinstance(refStp.model.relation, InMemoryRelation):
-            refInNames = [c.name for c in refStp.model.relation.inMemoryTable.columns]
+            #refInNames = [c.name for c in refStp.model.relation.inMemoryTable.columns]
+            # TODO Check if this ever occurs in an exported workflow
+            tbl = pl.read_csv("{}/{}/data.csv", referenceSchemaPath, refStp.model.relation.id)            
+            refInNames = [c for c in tbl.columns]
         else:    
-            sch = ctx.context.client.tableSchemaService.get(refStp.model.relation.relation.id)
-            refInNames = [c.name for c in sch.columns]
+            #sch = client.tableSchemaService.get(refStp.model.relation.relation.id)
+            #refInNames = [c.name for c in sch.columns]
+            tbl = pl.read_csv("{}/{}/data.csv".format(referenceSchemaPath, refStp.model.relation.relation.id) )
+            refInNames = [c for c in tbl.columns]
+
         
 
 
@@ -224,12 +287,14 @@ def compare_step(ctx, stp, refStp, tol=0, tolType="absolute", tableComp=[], verb
                 for k in range(0, len(joinOps)):
                     jop = joinOps[k]
                     refJop = refJoinOps[k]
-                    # res = compare_table(ctx,jop, refJop, tol)
-                    # tableRes = res[0]
-                    # hasDiff = res[1]
+                    res = compare_table(client,jop, refJop, referenceSchemaPath, tol)
+                    tableRes = res[0]
+                    hasDiff = res[1]
                     
-                    tableRes = {}
-                    hasDiff = False
+
+
+                    #tableRes = {}
+                    #hasDiff = False
                     # jop = joinOps[k]
                     # refJop = refJoinOps[k]
 
@@ -344,15 +409,15 @@ def compare_step(ctx, stp, refStp, tol=0, tolType="absolute", tableComp=[], verb
                         stepResult = {**stepResult, **tableRes}
     return stepResult
 
-def diff_workflow(ctx, workflow, refWorkflow, tol=0, tolType="absolute", verbose=False):
+def diff_workflow(client, workflow, refWorkflow, referenceSchemaPath, tol=0, tolType="absolute", verbose=False):
     resultDict = {}
     for i in range(0, len(workflow.steps)):
         stp = workflow.steps[i]
         refStp = refWorkflow.steps[i]
 
-        stepRes = compare_step(ctx, stp, refStp, tol, tolType, verbose)
+        stepRes = compare_step(client, stp, refStp, referenceSchemaPath, tol, tolType, verbose)
         resultDict = {**resultDict, **stepRes}
-        # NOTE TableStep comparison is likely not necessary
+
         
 
     return resultDict

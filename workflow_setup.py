@@ -2,7 +2,7 @@ import os
 import sys
 import json
 
-import uuid
+import copy
 
 from datetime import datetime
 
@@ -64,8 +64,12 @@ def update_operators(workflow, refWorkflow, operatorList, ctx, verbose=False):
     return workflow
 
 
-def create_test_workflow(ctx, workflowInfo, verbose=False):
-    refWorkflow = ctx.context.client.workflowService.get(workflowInfo["workflowId"])
+def create_test_workflow(ctx, refWorkflow, workflowInfo, verbose=False):
+    if refWorkflow == None:
+        refWorkflow = ctx.context.client.workflowService.get(workflowInfo["workflowId"])
+        workflow = ctx.context.client.workflowService.copyApp(refWorkflow.id, refWorkflow.projectId)
+    else:
+        workflow = copy.deepcopy(refWorkflow)
 
     # READ list of operators from input json and update accordingly in the cloned workflow
     operatorList = workflowInfo["operators"]
@@ -73,42 +77,10 @@ def create_test_workflow(ctx, workflowInfo, verbose=False):
     msg("Copying workflow", verbose)
     
     # CLONE reference workflow (but doesn't create a new one just yet)
-    workflow = ctx.context.client.workflowService.copyApp(refWorkflow.id, refWorkflow.projectId)
+    
 
     workflow.name = "{}_{}".format(refWorkflow.name, datetime.now().strftime("%Y%m%d_%H%M%S"))
     workflow.id = ''
-
-    # # TODO Might be unnecessary
-    # for lnk in workflow.links:
-    #     lnk.id = str(uuid.uuid4()) 
-
-    
-    # tableStepFiles = workflowInfo["tableStepFiles"]
-
-    # # TODO Link id update might be unnecessary
-    # for stp in workflow.steps:
-    #     oldId = stp.id
-    #     newId = str(uuid.uuid4())
-    #     stp.id = newId
-        
-
-    #     tblStepIdx = which([oldId == tbf["stepId"] for tbf in tableStepFiles])
-    #     if isinstance(tblStepIdx, int) or len(tblStepIdx) > 0:
-    #             tableStepFiles.append( {"stepId":stp.id, "fileId":tableStepFiles[tblStepIdx]["fileId"]} )
-
-    #     for k in range(0, len(stp.inputs)):
-    #         stp.inputs[k].id = "{}-i-{:d}".format(newId, k)
-    #         for lnk in workflow.links:
-    #             if lnk.inputId == "{}-i-{:d}".format(oldId, k):
-    #                 lnk.inputId = stp.inputs[k].id
-
-                
-
-    #     for k in range(0, len(stp.outputs)):
-    #         stp.outputs[k].id = "{}-o-{:d}".format(newId, k)
-    #         for lnk in workflow.links:
-    #             if lnk.outputId == "{}-o-{:d}".format(oldId, k):
-    #                 lnk.outputId = stp.outputs[k].id
 
     workflow = update_operators(workflow, refWorkflow, operatorList, ctx)
     
@@ -189,41 +161,6 @@ def update_table_relations(ctx, workflow, workflowInfo, verbose=False):
 
         workflow.steps[tblStepIdx].model.relation = rr
         workflow.steps[tblStepIdx].state.taskState = DoneState()
-
-
-    #  # Check and select Gather steps
-    # # Change the following ids
-    # # In table step, the rename id in model must match the relation id
-    # # The gather step must refer to this new id
-    # # TODO Check if necessary
-    # tableIdMaps = {}
-    # joinLinkMaps = {}
-    # for i in range(0, len(workflow.steps)):
-    #     stp = workflow.steps[i]
-    #     refStp = refWorkflow.steps[i]
-
-    #     if hasattr(stp.model, "relation") and hasattr(stp.model.relation, "relation"):
-    #         tableIdMaps[refStp.model.relation.id] = i
-    #         stp.model.relation.id = "{}".format(stp.model.relation.id)
-            
-
-    # # For gather steps, find the reference relation id, and use the new id
-    # for i in range(0, len(workflow.steps)):
-    #     # refStp = refWorkflow.steps[i]
-    #     stp = workflow.steps[i]
-    #     if isinstance(stp, MeltStep):
-            
-    #         for k in range(0, len(stp.meltedAttributes)):
-    #             ma = stp.meltedAttributes[k]
-    #             tableStp = workflow.steps[tableIdMaps[ma.relationId]]
-    #             stp.meltedAttributes[k].relationId = tableStp.model.relation.id
-                
-    #     if isinstance(stp, JoinStep):
-    #         for k in range(0, len(stp.rightAttributes)):
-    #             ma = stp.rightAttributes[k]
-    #             if not ma.relationId == '':
-    #                 tableStp = workflow.steps[tableIdMaps[ma.relationId]]
-    #                 stp.rightAttributes[k].relationId = tableStp.model.relation.id
 
     ctx.context.client.workflowService.update(workflow)
     

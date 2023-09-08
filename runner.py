@@ -5,19 +5,20 @@ import polars as pl
 
 from zipfile import ZipFile
 
-
+import tempfile, string, random
 
 sys.path.append('./')
 sys.path.append('../../')
 
-from util import msg 
+from util import msg, which
 from workflow_setup_client import create_test_workflow, update_table_relations
 from workflow_compare_client import diff_workflow
 from workflow_stats import stats_workflow
 
 from tercen.client.factory import TercenClient
 from tercen.client import context as tercen
-from tercen.model.base import RunWorkflowTask, InitState, DoneState, Workflow
+
+from tercen.model.base import RunWorkflowTask, InitState, DoneState, Workflow, TableSchema
 
 
 def run_workflow(workflow, project, client):
@@ -37,27 +38,28 @@ def parse_args(argv):
     opts, args = getopt.getopt(argv,"",
                                ["templateWkfId=", "templateWkfVersion=", 
                                 "templateRepo=", "templateWkfPath=",
-                                "serviceUri="])
+                                "serviceUri=", "projectId=",
+                                "user=", "passw=", "authToken=", "dataset=", "datasetMap="])
     
-    # NOTE
-    # When updating the golden standard it is necessary to update the IDs in the configuration file
-    # (TableSteps, Operator <=> DAtaStep, etc)
-    #/tercen/base/BaseObject.py
-
     # TODO
-    # 1 - Test comparison
-    # 2 - Try the full run getting workflow from github (will need to download file using wget from python)
-
     # python3 runner.py --templateRepo=tercen/workflow_runner --templateWkfPath=workflow_files/reference_workflow.zip --templateWkfVersion=a442105f74371285c49572148deb024436176ef8
     # wget -o /tmp/some_workflow.zip https://github.com/tercen/tercen_python_client/raw/0.7.11/setup.py
 
-    
+    # If this is passed, use this to get the workflow
     workflowId = ''
     workflowVersion = ''
-    serviceUri = ''
+    serviceUri = 'http://127.0.0.1'
+    servicePort = '5400'
     templateRepo = ''
     templateWkfPath = ''
-    #print(opts)
+    projectId = ''
+    user = 'test'
+    passw = 'test'
+    authToken = ''
+    confFilePath = ''
+    dataset = 'Crabs Data.csv'
+    datasetMap = {}
+    
     for opt, arg in opts:
         if opt == '-h':
             print('runner.py ARGS')
@@ -76,44 +78,131 @@ def parse_args(argv):
         if opt == '--templateWkfPath':
             templateWkfPath = arg
 
+        if opt == '--projectId':
+            projectId = arg
+
         if opt == '--serviceUri':
             serviceUri = arg
 
+        if opt == '--servicePort':
+            servicePort = arg
+
         if opt == '--workflowId':
             workflowId = arg
+
+        if opt == '--user':
+            user = arg
+        
+        if opt == '--passw':
+            passw = arg
+        
+        if opt == '--authToken':
+            authToken = arg
+
+        if opt == '--confFilePath':
+            confFilePath = arg
 
     #-O ./data/some_workflow.zip
     #https://github.com/tercen/workflow_runner/blob/a442105f74371285c49572148deb024436176ef8/workflow_files/reference_workflow.zip
     gitCmd = 'https://github.com/{}/raw/{}/{}'.format(templateRepo,workflowVersion,templateWkfPath)
     
-  
-    subprocess.call(['wget', '-O', './data/some_workflow.zip', gitCmd])
-    subprocess.run(["unzip", '-o', './data/some_workflow.zip'])
     
+    # tmpDir = "{}/{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
+    tmpDir = "./data/"
+
+    zipFilePath = "{}/{}".format(tmpDir, templateWkfPath.split("/")[-1])
+
+    #os.mkdir(tmpDir)
+    
+
+    #subprocess.call(['wget', '-O', zipFilePath, gitCmd])
+    #subprocess.run(["unzip", '-d', tmpDir, '-o', zipFilePath])
+
+    zip  = ZipFile(zipFilePath)
+    currentZipFolder = zip.namelist()[0]
+    
+
+    params = {}
+
+    with open( "{}/{}/workflow.json".format(tmpDir, currentZipFolder) ) as wf:
+        wkfJson = json.load(wf)
+        wkf = Workflow.createFromJson( wkfJson )
+        params["workflow"] = wkf
+        
+
+    params["referenceSchemaPath"] = "{}/{}/data/".format(tmpDir, currentZipFolder)
+
+
+    serviceUri = '{}:{}'.format(serviceUri, servicePort)
+
+    client = TercenClient(serviceUri)
+    client.userService.connect(user, passw)
+
+    params["client"] = client
+    params["projectId"] = projectId
+    params["confFilePath"] = confFilePath
+
+    #FIXME 
+    # Methods in the client's base.py are missing the response parse
+    # Se library calls like the one below are not working.
+    # This must be changed in future version, both in the client and here
+    # print(client.documentService.getTercenDatasetLibrary(0,100) )
+    #
+    # Also, this methods returns a TableSchema without id
+    from tercen.http.HttpClientService import HttpClientService, URI, encodeTSON, decodeTSON, MultiPart, MultiPartMixTransformer, URI
+    uri = URI.create("api/v1/d" + "/" + "getTercenDatasetLibrary")
+    p = {}
+    p["offset"] = 0
+    p["limit"] = 100
+    response = client.httpClient.post(
+        client.tercenURI.resolve(uri).toString(), None, encodeTSON(p))
+    
+    schemas = [TableSchema.createFromJson(sch) for sch in decodeTSON(response)]
+    idx = which([sch.name == dataset for sch in schemas])
+    
+    schema = schemas[idx]
+    #print(schema.id) # MISSING
+    # #END OF hard code for the client
+    
+    #FIXME HArdcoded
+    
+
+    #print(client.projectDocumentService.findSchemaByOwnerAndLastModifiedDate("test", ""))
+    docs = client.projectDocumentService.findSchemaByOwnerAndLastModifiedDate(user, "")
+    idx = which([doc.name == dataset for doc in docs])
+    doc = docs[idx[0]]
+    params["datasetId"] = doc.id
+
+    #fileList = client.projectDocumentService.findFileByLastModifiedDate("99999","") 
+    #[print(f.name) for f in fileList]
+    # Remove tmp files and zip file
+    #fileList = glob.glob("{}/*".format(tmpDir), recursive=False)
+    #for f in fileList:
+    #    if os.path.isdir(f):
+    #        shutil.rmtree(f)
+
+    return params
 
 
 if __name__ == '__main__':
-
     
+    #python3 runner.py --templateRepo=tercen/workflow_runner --templateWkfPath=workflow_files/reference_workflow.zip --templateWkfVersion=a442105f74371285c49572148deb024436176ef8 --projectId=2aa4e5e69e49703961f2af4c5e000dd1
 
     absPath = os.path.dirname(os.path.abspath(__file__))
     
-    parse_args(sys.argv[1:])
-    # python3 runner.py --templateRepo=tercen/workflow_runner --templateWkfPath=workflow_files/reference_workflow.zip --templateWkfVersion=a442105f74371285c49572148deb024436176ef8
+    params = parse_args(sys.argv[1:])
     
-
-    conf_path = os.path.join(absPath, 'env.conf')
+    
+    
+    #conf_path = os.path.join(absPath, 'env.conf')
     #json_path = os.path.join(absPath, 'workflow_files/run_all.json')
-    json_path = os.path.join(absPath, 'workflow_files/simple_run.json')
-    # json_path = os.path.join(absPath, 'workflow_files/diagnostic_plot.json')
-    # json_path = os.path.join(absPath, 'workflow_files/debarcode_workflow.json')
-    # json_path = os.path.join(absPath, 'workflow_files/gather_join2.json')
     
-    
-    # wget https://github.com/tercen/tercen_python_client/raw/0.7.11/setup.py
-    
-    with open(json_path) as f:
-        workflowInfo = json.load(f) 
+    #f8a28564-fd58-453c-a3f4-1111bf315f0b
+    print(params["datasetId"])
+    workflowInfo = {"verbose":True, "toleranceType":"relative","tolerance":0.001,"operators":[], 
+                    "tableStepFiles":[{"stepId":"", "fileId":params["datasetId"]}]}
+    #with open(json_path) as f:
+    #    workflowInfo = json.load(f) 
 
     if hasattr(workflowInfo, "verbose"):
         verbose = bool(workflowInfo["verbose"])
@@ -122,67 +211,20 @@ if __name__ == '__main__':
 
     msg( "Starting Workflow Runner.", verbose )
 
-    username = 'test'
-    passw = 'test'
-    conf = {}
+    client = params["client"]
 
-    with open(conf_path) as f:
-        for line in f:
-            if len(line.strip()) > 0:
-                (key, val) = line.split(sep="=")
-                conf[str(key)] = str(val).strip()
-    serviceUri = ''.join([conf["SERVICE_URL"], ":", conf["SERVICE_PORT"]])
-
-    with open(json_path) as f:
-        workflowInfo = json.load(f) 
-
-
-    
-
-    fileList = glob.glob("./data/*", recursive=False)
-    for f in fileList:
-        if os.path.isdir(f):
-            shutil.rmtree(f)
-
-    
-
-    with ZipFile("./workflow_files/reference_workflow.zip", 'r') as zip:
-        zip.extractall("./data/")
-
-
-    fileList = glob.glob("./data/*", recursive=False)
-    for f in fileList:
-        if os.path.isdir(f):
-            with open( f + "/workflow.json" ) as wf:
-                wkfJson = json.load(wf)
-                wkf = Workflow.createFromJson( wkfJson )
-                #print(wkf.toJson())
-
-
-    # ctx = tercen.TercenContext(
-    #     username=username,
-    #     password=passw,
-    #     serviceUri=serviceUri,
-    #     workflowId=workflowInfo["workflowId"])
-#    ctx = tercen.TercenContext(
-#        username=username,
-#        password=passw,
-#        serviceUri=serviceUri)
- 
-    client = TercenClient(serviceUri)
-    client.userService.connect(username, passw)
-
-    project = client.projectService.get("2aa4e5e69e49703961f2af4c5e000dd1")
+    project = client.projectService.get(params["projectId"])
+    wkf = params["workflow"]
     wkf.projectId = project.id
     wkf.acl = project.acl
-    #TODO Update project information on workflow
+
     
     workflows = create_test_workflow(client, wkf, workflowInfo, verbose=workflowInfo["verbose"])
     workflow = workflows[0]
     refWorkflow = workflows[1]
 
     update_table_relations(client, refWorkflow, workflow, workflowInfo, verbose=workflowInfo["verbose"])
-    
+
     msg("Running all steps", workflowInfo["verbose"])
     
     #refWorkflow = ctx.context.client.workflowService.get(workflowInfo["workflowId"])
@@ -192,16 +234,17 @@ if __name__ == '__main__':
     # Retrieve the updated, ran workflow
     workflow = client.workflowService.get(workflow.id)
     
-    referenceSchemaPath = "data/workflow-PDPRUY/data/"
-    resultDict = diff_workflow(client, workflow, refWorkflow, referenceSchemaPath, 0.0001, "relative", workflowInfo["verbose"])
+
+    resultDict = diff_workflow(client, workflow, refWorkflow, params["referenceSchemaPath"], workflowInfo["tolerance"],
+                                workflowInfo["toleranceType"], workflowInfo["verbose"])
     print(resultDict)
     client.workflowService.delete(workflow.id, workflow.rev)
-    """   
-    stats =  stats_workflow(ctx, workflow, refWorkflow, verbose=False)
+
+    #stats =  stats_workflow(ctx, workflow, refWorkflow, verbose=False)
     
 
 
-    print(stats)
+    #print(stats)
     
     # if workflowInfo["updateOnSuccess"] == "True" and len(resultDict) == 0:
     #     print("Updating reference workflow")
@@ -215,4 +258,4 @@ if __name__ == '__main__':
 
     #     ctx.context.client.workflowService.update(refWorkflow)
     #     run_workflow(refWorkflow, project, ctx)
-    """
+    

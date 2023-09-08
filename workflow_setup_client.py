@@ -174,6 +174,44 @@ def create_test_workflow(client, refWorkflow, workflowInfo, verbose=False):
 
     return [workflow,refWorkflow]
 
+def __file_relation(client, fileId):
+    try:
+        fileDoc = client.projectDocumentService.get(fileId)
+
+        isRefRel = False
+        if fileDoc.nRows == 0:
+            fSchema = client.tableSchemaService.get(fileDoc.relation.id, useFactory=True)
+            isRefRel = True
+        else:
+            fSchema = fileDoc
+
+        rr = RenameRelation()
+        rr.inNames = [f.name for f in fSchema.columns]
+        rr.inNames.append("{}._rids".format(fSchema.id))
+        rr.inNames.append("{}.tlbId".format(fSchema.id))
+        rr.outNames = [f.name for f in fSchema.columns]
+        rr.outNames.append("rowId")
+        rr.outNames.append("tableId")
+
+        if isRefRel == True:
+            rr.relation = ReferenceRelation()
+            rr.relation.relation = SimpleRelation()
+            rr.relation.id = fileDoc.id #fSchema.id
+            rr.relation.relation.id = fSchema.id
+            rr.id = "rename_{}".format(fileDoc.id)
+        else:
+            rr.relation = SimpleRelation()
+            rr.relation.id = fileDoc.id #fSchema.id
+            rr.id = "rename_{}".format(fileDoc.id)
+    except:
+        # If the file is used as an object (not the table operator) there will be no schema
+        # So we build a dataframe with the documentId
+        df = pl.DataFrame({"documentId":fileId})
+        rr = InMemoryRelation()
+        rr.inMemoryTable = utl.dataframe_to_table(df)[0]
+
+    return rr
+
 # Separate function for legibility
 def update_table_relations(client, refWorkflow, workflow, workflowInfo, verbose=False):
     msg("Setting up table step references in new workflow.", verbose)
@@ -181,52 +219,26 @@ def update_table_relations(client, refWorkflow, workflow, workflowInfo, verbose=
         refWorkflow = client.workflowService.get(workflowInfo["workflowId"])
 
 
-    #refWorkflow = client.workflowService.get(workflowInfo["workflowId"])
     tableStepFiles = workflowInfo["tableStepFiles"]
-    for tbf in tableStepFiles:
-        
-        tblStepIdx = which([stp.id == tbf["stepId"] for stp in workflow.steps])
-        if not (isinstance(tblStepIdx, int) or len(tblStepIdx) > 0):
-            continue
-        
-        try:
-            fileDoc = client.projectDocumentService.get(tbf["fileId"])
-
-            isRefRel = False
-            if fileDoc.nRows == 0:
-                fSchema = client.tableSchemaService.get(fileDoc.relation.id, useFactory=True)
-                isRefRel = True
-            else:
-                fSchema = fileDoc
-
-            rr = RenameRelation()
-            rr.inNames = [f.name for f in fSchema.columns]
-            rr.inNames.append("{}._rids".format(fSchema.id))
-            rr.inNames.append("{}.tlbId".format(fSchema.id))
-            rr.outNames = [f.name for f in fSchema.columns]
-            rr.outNames.append("rowId")
-            rr.outNames.append("tableId")
-
-            if isRefRel == True:
-                rr.relation = ReferenceRelation()
-                rr.relation.relation = SimpleRelation()
-                rr.relation.id = fileDoc.id #fSchema.id
-                rr.relation.relation.id = fSchema.id
-                rr.id = "rename_{}".format(fileDoc.id)
-            else:
-                rr.relation = SimpleRelation()
-                rr.relation.id = fileDoc.id #fSchema.id
-                rr.id = "rename_{}".format(fileDoc.id)
-        except:
-            # If the file is used as an object (not the table operator) there will be no schema
-            # So we build a dataframe with the documentId
-            df = pl.DataFrame({"documentId":tbf["fileId"]})
-            rr = InMemoryRelation()
-            rr.inMemoryTable = utl.dataframe_to_table(df)[0]
+    if len(tableStepFiles) == 1 and tableStepFiles[0]["stepId"] == "":
+        for i in range(0, len(workflow.steps)):
             
+            if isinstance(workflow.steps[i], TableStep):
+                rr = __file_relation(client, tableStepFiles[0]["fileId"])
+                workflow.steps[i].model.relation = rr
+                workflow.steps[i].state.taskState = DoneState()
+    else:
+        for tbf in tableStepFiles:
+            
+            tblStepIdx = which([stp.id == tbf["stepId"] for stp in workflow.steps])
+            if not (isinstance(tblStepIdx, int) or len(tblStepIdx) > 0):
+                continue
 
-        workflow.steps[tblStepIdx].model.relation = rr
-        workflow.steps[tblStepIdx].state.taskState = DoneState()
+            rr = __file_relation(client, tbf["fileId"])
+           
+
+            workflow.steps[tblStepIdx].model.relation = rr
+            workflow.steps[tblStepIdx].state.taskState = DoneState()
 
     client.workflowService.update(workflow)
     

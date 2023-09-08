@@ -21,11 +21,11 @@ def polarDtype_to_numpyDtype(plType):
     if plType == pl.Float64:
         npDtype = np.float64
 
-    if plType == pl.Int64:
-        npDtype = np.int64
-
-    if plType == pl.Int32:
+    if plType == pl.Int64 or plType == pl.Int32:
         npDtype = np.int32
+
+    #if plType == pl.Int32:
+    #    npDtype = np.int32
 
     return npDtype
 
@@ -250,8 +250,7 @@ def compare_step(client, stp, refStp, referenceSchemaPath, tol=0, tolType="absol
 
 
         res = compare_columns_metadata(inNames, refInNames)
-        
-        
+
 
         if len(res) > 0:
             res["Name"] = stp.name
@@ -292,114 +291,6 @@ def compare_step(client, stp, refStp, referenceSchemaPath, tol=0, tolType="absol
                     hasDiff = res[1]
                     
 
-
-                    #tableRes = {}
-                    #hasDiff = False
-                    # jop = joinOps[k]
-                    # refJop = refJoinOps[k]
-
-                    # if isinstance(jop.rightRelation, SimpleRelation):
-                    #     schema = ctx.context.client.tableSchemaService.get(
-                    #         jop.rightRelation.id
-                    #     )
-                        
-                    # else:
-                    #     schema = ctx.context.client.tableSchemaService.get(
-                    #         jop.rightRelation.relation.mainRelation.id
-                    #     )
-
-                    # if isinstance(refJop.rightRelation, SimpleRelation):
-                    #     refSchema = ctx.context.client.tableSchemaService.get(
-                    #         refJop.rightRelation.id
-                    #     )
-                    # else:
-                    #     refSchema = ctx.context.client.tableSchemaService.get(
-                    #         refJop.rightRelation.relation.mainRelation.id
-                    #     )
-
-                    # # Compare schemas
-                    # refColNames = [c.name for c in refSchema.columns]
-                    # colNames = [c.name for c in schema.columns]
-                    # res = compare_columns_metadata(colNames, refColNames)
-
-                    # if len(res) > 0:
-                    #     tableRes = {**tableRes, **res}
-                    #     hasDiff = True
-                    
-                    # if schema.nRows != refSchema.nRows:
-                    #     hasDiff = True
-                    #     tableRes["NumRows"] = "Number rows tables do not match for Table {:d} : {:d} x {:d} (Reference vs Workflow)".format(
-                    #         k + 1,
-                    #         refSchema.nRows,
-                    #         schema.nRows 
-                    #     )
-                    # else:
-                    #     # Same number of columns and same number of rows
-                    #     # We can compare values column-wise
-                        
-                        
-                    #     for ci in range(0, len(colNames)):
-                    #         msg("Comparing {} against {}".format(colNames[ci], colNames[ci]))
-                    #         col = th.decodeTSON(ctx.context.client.tableSchemaService.selectStream(schema.id, [colNames[ci]], 0, -1))
-                    #         colVals = col["columns"][0]["values"]
-                    #         refCol = th.decodeTSON(ctx.context.client.tableSchemaService.selectStream(refSchema.id, [refColNames[ci]], 0, -1))
-                    #         refColVals = refCol["columns"][0]["values"]
-
-                    #         if type(colVals[0]) != type(refColVals[0]):
-                    #             tableRes["ColType"] = "Column tables do not match for Table {:d}, column {:d} : {:d} x {:d} (Reference vs Workflow)".format(
-                    #                 k + 1,
-                    #                 ci + 1,
-                    #                 type(refColVals[0]),
-                    #                 type(colVals[0]) 
-                    #             )
-
-                    #         def isnumeric(val):
-                    #            return isinstance(val, int) or isinstance(val, float)
-                    #         testEqualityOnly = False
-                    #         if not isnumeric(col["columns"][0]["values"]) or not isnumeric(refCol["columns"][0]["values"]):
-                    #             testEqualityOnly = True
-
-
-                    #         if isnumeric(col["columns"][0]["values"]):
-                    #             colVals = col["columns"][0]["values"].astype(float)
-                    #         if isnumeric(refCol["columns"][0]["values"]):
-                    #             refColVals = refCol["columns"][0]["values"].astype(float)
-
-                    #         rel = np.zeros((len(colVals)))
-                    #         for w in range(0, len(colVals)):
-                    #             if testEqualityOnly or tolType == "equality":
-                    #                 if refColVals[w] == colVals[w]:
-                    #                     rel[w] = 0
-                    #                 else:
-                    #                     rel[w] = 1
-                    #             elif tolType == "absolute":
-                    #                 rel[w] = abs(refColVals[w]-colVals[w])
-                    #             else:
-
-                    #                 if refColVals[w] == 0 and colVals[w] == 0:
-                    #                     rel[w] = 0
-                    #                 elif (refColVals[w] == 0 and colVals[w] != 0) or (refColVals[w] != 0 and colVals[w] == 0):
-                    #                         rel[w] = 9999
-                    #                 else:
-                    #                     rel[w] = abs(1-colVals[w]/(refColVals[w]))
-                            
-                            
-                    #         if np.any(rel > tol):
-                    #             colResult = {
-                    #                 "RefColName":refColNames[ci],
-                    #                 "ColName":colNames[ci],
-                    #                 "RefValues":refColVals,
-                    #                 "Values":colVals,
-                    #                 "OutOfRangeIdx":which(rel > tol),
-                    #                 "CompResult":rel
-                    #             }
-                    #             if hasattr(tableRes, "ColumnResults"):
-                    #                 tableRes["ColumnResults"].append(colResult)
-                    #             else:
-                    #                 tableRes["ColumnResults"] = [colResult]
-
-                    #             hasDiff = True
-                                
 
                         
 

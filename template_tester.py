@@ -200,15 +200,17 @@ def parse_args(argv):
 
 if __name__ == '__main__':
     
-    #python3 runner.py --templateInfo=data/template_map.json --projectId=2aa4e5e69e49703961f2af4c5e000dd1
+    #python3 template_tester.py --templateInfo=workflow_files/template_map.json --projectId=2aa4e5e69e49703961f2af4c5e000dd1
 
     absPath = os.path.dirname(os.path.abspath(__file__))
     
     params = parse_args(sys.argv[1:])
-    print(params["templateInfo"])
+
 
     # Add to params
     verbose = True
+
+    resultList = []
 
     msg( "Starting Workflow Runner.", verbose )
     msg( "Testing template {}.".format(params["templateInfo"]["templateName"]), verbose )
@@ -218,14 +220,15 @@ if __name__ == '__main__':
         #https://github.com/tercen/workflow_runner/blob/a442105f74371285c49572148deb024436176ef8/workflow_files/reference_workflow.zip
         gitCmd = 'https://github.com/{}/raw/{}/{}'.format(wkfParams["repo"], wkfParams["version"],wkfParams["goldenStandard"])
         
-        
         # tmpDir = "{}/{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
-        tmpDir = "./data/"
+        tmpDir = "data"
 
         zipFilePath = "{}/{}".format(tmpDir, wkfParams["goldenStandard"].split("/")[-1])
 
         #os.mkdir(tmpDir)
-
+        #print(wkfParams["goldenStandard"].split("/")[-1])
+        #print(zipFilePath)
+        #print(gitCmd)
         subprocess.call(['wget', '-O', zipFilePath, gitCmd])
         subprocess.run(["unzip", '-d', tmpDir, '-o', zipFilePath])
 
@@ -250,49 +253,71 @@ if __name__ == '__main__':
         client = params["client"]
         msg( "Testing workflow {}/{}".format(wkfParams["repo"], wkfParams["goldenStandard"]), verbose )
 
+        project = client.projectService.get(params["projectId"])
 
 
-        # Remove tmp files and zip file
-        fileList = glob.glob("{}/*".format(tmpDir), recursive=False)
-        for f in fileList:
-           if os.path.isdir(f):
-               shutil.rmtree(f)
-
-        pass
-    sys.exit(0)
-    
-
-
+        zip  = ZipFile(zipFilePath)
+        currentZipFolder = zip.namelist()[0]
     
 
     
 
-    project = client.projectService.get(params["projectId"])
-    wkf = params["workflow"]
-    wkf.projectId = project.id
-    wkf.acl = project.acl
+        # with open( "{}/{}/workflow.json".format(tmpDir, currentZipFolder) ) as wf:
+        #     wkfJson = json.load(wf)
+        #     wkf = Workflow.createFromJson( wkfJson )
 
-    
-    workflows = create_test_workflow(client, wkf, workflowInfo, verbose=workflowInfo["verbose"])
-    workflow = workflows[0]
-    refWorkflow = workflows[1]
+        wkf.projectId = project.id
+        wkf.acl = project.acl
 
-    update_table_relations(client, refWorkflow, workflow, workflowInfo, verbose=workflowInfo["verbose"])
+        workflows = create_test_workflow(client, wkf, workflowInfo, verbose=workflowInfo["verbose"])
+        workflow = workflows[0]
+        refWorkflow = workflows[1]
 
-    msg("Running all steps", workflowInfo["verbose"])
-    
-    #refWorkflow = ctx.context.client.workflowService.get(workflowInfo["workflowId"])
-    run_workflow(workflow, project, client)
-    msg("Finished", workflowInfo["verbose"])
-    
-    # Retrieve the updated, ran workflow
-    workflow = client.workflowService.get(workflow.id)
-    
+        params["referenceSchemaPath"] = "{}/{}/data/".format(tmpDir, currentZipFolder)
 
-    resultDict = diff_workflow(client, workflow, refWorkflow, params["referenceSchemaPath"], workflowInfo["tolerance"],
+        update_table_relations(client, refWorkflow, workflow, workflowInfo, verbose=workflowInfo["verbose"])
+
+        msg("Running all steps", workflowInfo["verbose"])
+
+
+        run_workflow(workflow, project, client)
+        msg("Finished", workflowInfo["verbose"])
+
+        # Retrieve the updated, ran workflow
+        workflow = client.workflowService.get(workflow.id)
+
+        resultDict = diff_workflow(client, workflow, refWorkflow, params["referenceSchemaPath"], workflowInfo["tolerance"],
                                 workflowInfo["toleranceType"], workflowInfo["verbose"])
-    print(resultDict)
-    client.workflowService.delete(workflow.id, workflow.rev)
+
+        resultList.append(resultDict)
+
+        client.workflowService.delete(workflow.id, workflow.rev)
+
+        
+
+
+    
+    print(resultList)
+
+    # Remove tmp files and zip file
+    fileList = glob.glob("{}/*".format(tmpDir), recursive=False)
+    for f in fileList:
+        if os.path.isdir(f):
+            shutil.rmtree(f)
+        else:
+            os.unlink(f)
+    
+
+
+    #refWorkflow = ctx.context.client.workflowService.get(workflowInfo["workflowId"])
+
+    
+    
+    
+
+    
+    #print(resultDict)
+    
 
     #stats =  stats_workflow(ctx, workflow, refWorkflow, verbose=False)
     

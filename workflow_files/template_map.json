@@ -7,23 +7,17 @@
     "workflows":[
         {
             "repo":"tercen/workflow_lib_repo",
-            "version":"ad11eb331d8e6c3dd90ceef49f796e837a4af25a",
-            "goldenStandard":"golden_standard_mean.zip",
-            "operators":[{
-                "stepId":"191e343e-c077-4781-9b3d-07f1138b91c4",
-                "operatorURL":"https://github.com/tercen/mean_operator",
-                "version":"1.2.0"
-        }]
+            "version":"latest",
+            "goldenStandard":"golden_standard_mean_crabs.zip",
+            "operators":[],
+            "tableStepFiles":[{"stepId":"", "filename":"Crabs Data.csv"}]
         },
         {
             "repo":"tercen/workflow_lib_repo",
-            "version":"ad11eb331d8e6c3dd90ceef49f796e837a4af25a",
-            "goldenStandard":"golden_standard_median.zip",
-            "operators":[{
-                "stepId":"191e343e-c077-4781-9b3d-07f1138b91c4",
-                "operatorURL":"https://github.com/tercen/median_operator",
-                "version":"1.1.0"
-        }]
+            "version":"latest",
+            "goldenStandard":"golden_standard_mean_crabs_2.zip",
+            "operators":[],
+            "tableStepFiles":[{"stepId":"", "filename":"Crabs DataB.csv"}]
         }
     ]
 

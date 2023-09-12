@@ -112,50 +112,10 @@ def parse_args(argv):
     client.userService.connect(user, passw)
 
     params["client"] = client
+    params["user"] = user
     params["projectId"] = projectId
     params["confFilePath"] = confFilePath
     
-
-    # #-O ./data/some_workflow.zip
-    # #https://github.com/tercen/workflow_runner/blob/a442105f74371285c49572148deb024436176ef8/workflow_files/reference_workflow.zip
-    # gitCmd = 'https://github.com/{}/raw/{}/{}'.format(templateRepo,workflowVersion,templateWkfPath)
-    
-    
-    # # tmpDir = "{}/{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
-    # tmpDir = "./data/"
-
-    # zipFilePath = "{}/{}".format(tmpDir, templateWkfPath.split("/")[-1])
-
-    # #os.mkdir(tmpDir)
-    
-
-    # #subprocess.call(['wget', '-O', zipFilePath, gitCmd])
-    # #subprocess.run(["unzip", '-d', tmpDir, '-o', zipFilePath])
-
-    # zip  = ZipFile(zipFilePath)
-    # currentZipFolder = zip.namelist()[0]
-    
-
-    # 
-
-    # with open( "{}/{}/workflow.json".format(tmpDir, currentZipFolder) ) as wf:
-    #     wkfJson = json.load(wf)
-    #     wkf = Workflow.createFromJson( wkfJson )
-    #     params["workflow"] = wkf
-        
-
-    # params["referenceSchemaPath"] = "{}/{}/data/".format(tmpDir, currentZipFolder)
-
-
-    # serviceUri = '{}:{}'.format(serviceUri, servicePort)
-
-    # client = TercenClient(serviceUri)
-    # client.userService.connect(user, passw)
-
-    # params["client"] = client
-    # params["projectId"] = projectId
-    # params["confFilePath"] = confFilePath
-
     # #FIXME 
     # # Methods in the client's base.py are missing the response parse
     # # Se library calls like the one below are not working.
@@ -177,23 +137,7 @@ def parse_args(argv):
     # schema = schemas[idx]
     # #print(schema.id) # MISSING
     # # #END OF hard code for the client
-    
-    # #FIXME HArdcoded
-    
 
-    # #print(client.projectDocumentService.findSchemaByOwnerAndLastModifiedDate("test", ""))
-    docs = client.projectDocumentService.findSchemaByOwnerAndLastModifiedDate(user, "")
-    idx = which([doc.name == dataset for doc in docs])
-    doc = docs[idx[0]]
-    params["datasetId"] = doc.id
-
-    # #fileList = client.projectDocumentService.findFileByLastModifiedDate("99999","") 
-    # #[print(f.name) for f in fileList]
-    # # Remove tmp files and zip file
-    # #fileList = glob.glob("{}/*".format(tmpDir), recursive=False)
-    # #for f in fileList:
-    # #    if os.path.isdir(f):
-    # #        shutil.rmtree(f)
 
     return params
 
@@ -215,39 +159,42 @@ if __name__ == '__main__':
     msg( "Starting Workflow Runner.", verbose )
     msg( "Testing template {}.".format(params["templateInfo"]["templateName"]), verbose )
     for wkfParams in params["templateInfo"]["workflows"]:
+        if wkfParams["version"] == 'latest':
+            version = 'main'
+            # version = subprocess.check_output(['git', '-c',  "versionsort.suffix=-", "ls-remote", "--sort=v:refname",
+            #                             "https://github.com/tercen/tercen"])
+            # version = version.splitlines()[-1].decode("utf-8")
+            # version = version.split('\t')[0].strip()
+            
+        else:
+            version = wkfParams["version"]
+        
+        #git -c 'versionsort.suffix=-' ls-remote --tags --sort='v:refname' https://github.com/tercen/tercen | tail --lines=1 | cut --delimiter='       ' --fields=1
 
         #-O ./data/some_workflow.zip
         #https://github.com/tercen/workflow_runner/blob/a442105f74371285c49572148deb024436176ef8/workflow_files/reference_workflow.zip
-        gitCmd = 'https://github.com/{}/raw/{}/{}'.format(wkfParams["repo"], wkfParams["version"],wkfParams["goldenStandard"])
-        
+        gitCmd = 'https://github.com/{}/raw/{}/{}'.format(wkfParams["repo"], version,wkfParams["goldenStandard"])
+
         # tmpDir = "{}/{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
         tmpDir = "data"
 
         zipFilePath = "{}/{}".format(tmpDir, wkfParams["goldenStandard"].split("/")[-1])
 
         #os.mkdir(tmpDir)
-        #print(wkfParams["goldenStandard"].split("/")[-1])
-        #print(zipFilePath)
-        #print(gitCmd)
+
         subprocess.call(['wget', '-O', zipFilePath, gitCmd])
         subprocess.run(["unzip", '-d', tmpDir, '-o', zipFilePath])
 
         zip  = ZipFile(zipFilePath)
         currentZipFolder = zip.namelist()[0]
 
-        with open( "{}/{}/workflow.json".format(tmpDir, currentZipFolder) ) as wf:
-            wkfJson = json.load(wf)
-            wkf = Workflow.createFromJson( wkfJson )
-            params["workflow"] = wkf
-
-
         workflowInfo = {"verbose":True, "toleranceType":"relative","tolerance":0.001,"operators":[], 
-                "tableStepFiles":[{"stepId":"", "fileId":params["datasetId"]}]}
+                "tableStepFiles":[{"stepId":"", "filename":""}]}
 
-        # if hasattr(workflowInfo, "verbose"):
-        #     verbose = bool(workflowInfo["verbose"])
-        # else:
-        #     verbose = False
+        if hasattr(workflowInfo, "verbose"):
+            verbose = bool(workflowInfo["verbose"])
+        else:
+            verbose = False
 
         
         client = params["client"]
@@ -262,20 +209,21 @@ if __name__ == '__main__':
 
     
 
-        # with open( "{}/{}/workflow.json".format(tmpDir, currentZipFolder) ) as wf:
-        #     wkfJson = json.load(wf)
-        #     wkf = Workflow.createFromJson( wkfJson )
+        with open( "{}/{}/workflow.json".format(tmpDir, currentZipFolder) ) as wf:
+            wkfJson = json.load(wf)
+            wkf = Workflow.createFromJson( wkfJson )
+            params["workflow"] = wkf
 
         wkf.projectId = project.id
         wkf.acl = project.acl
 
-        workflows = create_test_workflow(client, wkf, workflowInfo, verbose=workflowInfo["verbose"])
+        workflows = create_test_workflow(client, wkf, workflowInfo, verbose=verbose)
         workflow = workflows[0]
         refWorkflow = workflows[1]
 
         params["referenceSchemaPath"] = "{}/{}/data/".format(tmpDir, currentZipFolder)
 
-        update_table_relations(client, refWorkflow, workflow, workflowInfo, verbose=workflowInfo["verbose"])
+        update_table_relations(client, refWorkflow, workflow, wkfParams, params["user"], verbose=verbose)
 
         msg("Running all steps", workflowInfo["verbose"])
 
@@ -308,16 +256,6 @@ if __name__ == '__main__':
             os.unlink(f)
     
 
-
-    #refWorkflow = ctx.context.client.workflowService.get(workflowInfo["workflowId"])
-
-    
-    
-    
-
-    
-    #print(resultDict)
-    
 
     #stats =  stats_workflow(ctx, workflow, refWorkflow, verbose=False)
     

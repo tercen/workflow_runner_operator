@@ -212,19 +212,36 @@ def __file_relation(client, fileId):
 
     return rr
 
+
+def __get_file_id(client, user, tbf):
+    if hasattr(tbf,"fileId"):
+        return tbf["fileId"]
+    else:
+        docs = client.projectDocumentService.findSchemaByOwnerAndLastModifiedDate(user, "")
+        idx = which([doc.name == tbf["filename"] for doc in docs])
+
+        # TODO Abort if filename does not exist
+        if isinstance(idx, list):
+            doc = docs[idx[0]]
+        else:
+            doc = docs[idx]
+
+        return doc.id
+
 # Separate function for legibility
-def update_table_relations(client, refWorkflow, workflow, workflowInfo, verbose=False):
+def update_table_relations(client, refWorkflow, workflow, workflowInfo, user, verbose=False):
     msg("Setting up table step references in new workflow.", verbose)
     if refWorkflow == None:
         refWorkflow = client.workflowService.get(workflowInfo["workflowId"])
-
 
     tableStepFiles = workflowInfo["tableStepFiles"]
     if len(tableStepFiles) == 1 and tableStepFiles[0]["stepId"] == "":
         for i in range(0, len(workflow.steps)):
             
             if isinstance(workflow.steps[i], TableStep):
-                rr = __file_relation(client, tableStepFiles[0]["fileId"])
+                print( tableStepFiles[0])
+                fileId = __get_file_id(client, user, tableStepFiles[0])
+                rr = __file_relation(client, fileId)
                 workflow.steps[i].model.relation = rr
                 workflow.steps[i].state.taskState = DoneState()
     else:
@@ -234,7 +251,8 @@ def update_table_relations(client, refWorkflow, workflow, workflowInfo, verbose=
             if not (isinstance(tblStepIdx, int) or len(tblStepIdx) > 0):
                 continue
 
-            rr = __file_relation(client, tbf["fileId"])
+            fileId = __get_file_id(client, user, tbf)
+            rr = __file_relation(client, fileId)
            
 
             workflow.steps[tblStepIdx].model.relation = rr

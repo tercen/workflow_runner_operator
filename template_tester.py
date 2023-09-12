@@ -42,10 +42,7 @@ def parse_args(argv):
                                 "serviceUri=", "projectId=",
                                 "user=", "passw=", "authToken=", "dataset=", "datasetMap="])
     
-    # python3 runner.py --templateRepo=tercen/workflow_runner --templateWkfPath=workflow_files/reference_workflow.zip --templateWkfVersion=a442105f74371285c49572148deb024436176ef8
-    # wget -o /tmp/some_workflow.zip https://github.com/tercen/tercen_python_client/raw/0.7.11/setup.py
 
-    # If this is passed, use this to get the workflow
     templateInfo = ''
     workflowVersion = ''
     serviceUri = 'http://127.0.0.1'
@@ -57,8 +54,7 @@ def parse_args(argv):
     passw = 'test'
     authToken = ''
     confFilePath = ''
-    dataset = 'Crabs Data.csv'
-    datasetMap = {}
+
     
     for opt, arg in opts:
         if opt == '-h':
@@ -130,10 +126,8 @@ def parse_args(argv):
     # p["limit"] = 100
     # response = client.httpClient.post(
     #     client.tercenURI.resolve(uri).toString(), None, encodeTSON(p))
-    
     # schemas = [TableSchema.createFromJson(sch) for sch in decodeTSON(response)]
     # idx = which([sch.name == dataset for sch in schemas])
-    
     # schema = schemas[idx]
     # #print(schema.id) # MISSING
     # # #END OF hard code for the client
@@ -143,17 +137,23 @@ def parse_args(argv):
 
 
 if __name__ == '__main__':
-    
     #python3 template_tester.py --templateInfo=workflow_files/template_map.json --projectId=2aa4e5e69e49703961f2af4c5e000dd1
 
     absPath = os.path.dirname(os.path.abspath(__file__))
     
     params = parse_args(sys.argv[1:])
+    
+    # DEFAULT
+    workflowInfo = {"verbose":True, "toleranceType":"relative","tolerance":0.001,"operators":[], 
+                "tableStepFiles":[{"stepId":"", "filename":""}]}
+    
+    if hasattr(workflowInfo, "verbose"):
+        verbose = bool(workflowInfo["verbose"])
+    else:
+        verbose = False
 
-
+        
     # Add to params
-    verbose = True
-
     resultList = []
 
     msg( "Starting Workflow Runner.", verbose )
@@ -161,11 +161,7 @@ if __name__ == '__main__':
     for wkfParams in params["templateInfo"]["workflows"]:
         if wkfParams["version"] == 'latest':
             version = 'main'
-            # version = subprocess.check_output(['git', '-c',  "versionsort.suffix=-", "ls-remote", "--sort=v:refname",
-            #                             "https://github.com/tercen/tercen"])
-            # version = version.splitlines()[-1].decode("utf-8")
-            # version = version.split('\t')[0].strip()
-            
+           
         else:
             version = wkfParams["version"]
         
@@ -188,13 +184,9 @@ if __name__ == '__main__':
         zip  = ZipFile(zipFilePath)
         currentZipFolder = zip.namelist()[0]
 
-        workflowInfo = {"verbose":True, "toleranceType":"relative","tolerance":0.001,"operators":[], 
-                "tableStepFiles":[{"stepId":"", "filename":""}]}
+        
 
-        if hasattr(workflowInfo, "verbose"):
-            verbose = bool(workflowInfo["verbose"])
-        else:
-            verbose = False
+
 
         
         client = params["client"]

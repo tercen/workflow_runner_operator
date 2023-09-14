@@ -217,7 +217,8 @@ def __file_relation(client, fileId):
 
 
 def __get_file_id(client, user, tbf):
-    if hasattr(tbf,"fileId"):
+
+    if "fileId" in tbf:
         return tbf["fileId"]
     else:
         docs = client.projectDocumentService.findSchemaByOwnerAndLastModifiedDate(user, "")
@@ -251,7 +252,7 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
                 workflow.steps[i].model.relation = rr
                 workflow.steps[i].state.taskState = DoneState()
     else:
-        for tbf in tableStepFiles:
+        for tbf in filemap:
             
             tblStepIdx = which([stp.id == tbf["stepId"] for stp in workflow.steps])
             if not (isinstance(tblStepIdx, int) or len(tblStepIdx) > 0):

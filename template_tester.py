@@ -172,7 +172,9 @@ def parse_args(argv):
     params["gsPath"] = gsPath
     
     params["filename"] = filename
-    params["filemap"] = filemap    
+    print(filemap)
+    with open(filemap) as f:
+        params["filemap"] = json.load(f)
     
     # #FIXME 
     # # Methods in the client's base.py are missing the response parse

@@ -134,7 +134,10 @@ def create_test_workflow(client, refWorkflow, workflowInfo, verbose=False):
         workflow = copy.deepcopy(refWorkflow)
 
     # READ list of operators from input json and update accordingly in the cloned workflow
-    operatorList = workflowInfo["operators"]
+    if hasattr(workflowInfo, "operators"):
+        operatorList = workflowInfo["operators"]
+    else:
+        operatorList = []
 
     msg("Copying workflow", verbose)
     
@@ -218,7 +221,10 @@ def __get_file_id(client, user, tbf):
         return tbf["fileId"]
     else:
         docs = client.projectDocumentService.findSchemaByOwnerAndLastModifiedDate(user, "")
-        idx = which([doc.name == tbf["filename"] for doc in docs])
+        docComp = [doc.name == tbf["filename"] for doc in docs]
+        if len(docs) == 0 or not np.any(docComp):
+            raise FileNotFoundError("!!ERROR!! Document {} not found. Cannot set TableStep, so aborting execution.".format(tbf["filename"]))
+        idx = which(docComp)
 
         # TODO Abort if filename does not exist
         if isinstance(idx, list):
@@ -229,18 +235,18 @@ def __get_file_id(client, user, tbf):
         return doc.id
 
 # Separate function for legibility
-def update_table_relations(client, refWorkflow, workflow, workflowInfo, user, verbose=False):
+def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose=False):
     msg("Setting up table step references in new workflow.", verbose)
     if refWorkflow == None:
         refWorkflow = client.workflowService.get(workflowInfo["workflowId"])
 
-    tableStepFiles = workflowInfo["tableStepFiles"]
-    if len(tableStepFiles) == 1 and tableStepFiles[0]["stepId"] == "":
+    #tableStepFiles = workflowInfo["tableStepFiles"]
+    if isinstance(filemap, str): #len(tableStepFiles) == 1 and tableStepFiles[0]["stepId"] == "":
         for i in range(0, len(workflow.steps)):
-            
+            filemap = {"filename":filemap}
             if isinstance(workflow.steps[i], TableStep):
-                print( tableStepFiles[0])
-                fileId = __get_file_id(client, user, tableStepFiles[0])
+                #print( tableStepFiles[0])
+                fileId = __get_file_id(client, user, filemap)
                 rr = __file_relation(client, fileId)
                 workflow.steps[i].model.relation = rr
                 workflow.steps[i].state.taskState = DoneState()

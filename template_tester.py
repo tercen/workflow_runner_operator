@@ -18,7 +18,7 @@ from workflow_stats import stats_workflow
 from tercen.client.factory import TercenClient
 from tercen.client import context as tercen
 
-from tercen.model.base import RunWorkflowTask, InitState, DoneState, Workflow, TableSchema
+from tercen.model.base import RunWorkflowTask, InitState, DoneState, Workflow, TableSchema, Relation
 
 
 def run_workflow(workflow, project, client):
@@ -37,23 +37,39 @@ def run_workflow(workflow, project, client):
 def parse_args(argv):
     params = {}
     opts, args = getopt.getopt(argv,"",
-                               ["templateInfo=", "templateWkfVersion=", 
-                                "templateRepo=", "templateWkfPath=",
+                               ["templateInfo=", 
+                                "templateVersion=", "templateRepo=", "templatePath=",
+                                "gsVersion=", "gsRepo=", "gsPath=",
                                 "serviceUri=", "projectId=",
-                                "user=", "passw=", "authToken=", "dataset=", "datasetMap="])
+                                "user=", "passw=", "authToken=", "dataset=", "datasetMap=", "verbose",
+                                "tolerance=", "toleranceType=",
+                                "filename=", "filemap="])
     
-
-    templateInfo = ''
-    workflowVersion = ''
+# workflowInfo = {"verbose":True, "toleranceType":"relative","tolerance":0.001,"operators":[], 
+                # "tableStepFiles":[{"stepId":"", "filename":""}]}
     serviceUri = 'http://127.0.0.1'
     servicePort = '5400'
     templateRepo = ''
-    templateWkfPath = ''
+    templatePath = ''
+    templateVersion = ''
+
+    gsRepo = ''
+    gsPath = ''
+    gsVersion = ''
+
     projectId = ''
     user = 'test'
     passw = 'test'
     authToken = ''
     confFilePath = ''
+    verbose = False
+    
+    tolerance = 0.001
+    toleranceType="relative"
+
+    # TODO Add the file mapping parse for multiple table steps situation
+    filename=None
+    filemap=None 
 
     
     for opt, arg in opts:
@@ -64,15 +80,29 @@ def parse_args(argv):
         if opt == '--templateInfo':
             templateInfo = arg
         
-        if opt == '--templateWkfVersion':
-            workflowVersion = arg
+        if opt == '--templateVersion':
+            templateVersion = arg
+            if templateVersion == "latest":
+                templateVersion = "main"
         
         if opt == '--templateRepo':
             templateRepo = arg
 
 
-        if opt == '--templateWkfPath':
-            templateWkfPath = arg
+        if opt == '--templatePath':
+            templatePath = arg
+
+        if opt == '--gsVersion':
+            gsVersion = arg
+            if gsVersion == "latest":
+                gsVersion = "main"
+        
+        if opt == '--gsRepo':
+            gsRepo = arg
+
+
+        if opt == '--gsPath':
+            gsPath = arg
 
         if opt == '--projectId':
             projectId = arg
@@ -98,10 +128,25 @@ def parse_args(argv):
         if opt == '--confFilePath':
             confFilePath = arg
 
-    with open(templateInfo) as f:
-        templateInfo = json.load(f)
+        if opt == '--tolerance':
+            tolerance = float(arg)
 
-    params["templateInfo"] = templateInfo
+        if opt == '--toleranceType':
+            toleranceType = arg
+
+        if opt == '--verbose':
+            verbose = True
+
+        if opt == '--filename':
+            filename = arg
+        if opt == '--filemap':
+            filemap = arg
+            
+            
+
+    #with open(templateInfo) as f:
+    #    templateInfo = json.load(f)
+    #params["templateInfo"] = templateInfo
     serviceUri = '{}:{}'.format(serviceUri, servicePort)
 
     client = TercenClient(serviceUri)
@@ -111,6 +156,23 @@ def parse_args(argv):
     params["user"] = user
     params["projectId"] = projectId
     params["confFilePath"] = confFilePath
+    params["verbose"] = verbose
+    params["tolerance"] = tolerance
+    params["toleranceType"] = toleranceType
+
+    # python3 template_tester.py  --templateRepo=tercen/workflow_lib_repo --templateVersion=latest --templatePath=template_mean_crabs_2.zip --gsRepo=tercen/workflow_lib_repo --gsVersion=latest --gsPath=golden_standard_mean_crabs_2.zip --projectId=2aa4e5e69e49703961f2af4c5e000dd1
+
+    
+    params["templateVersion"] = templateVersion
+    params["templateRepo"] = templateRepo
+    params["templatePath"] = templatePath
+
+    params["gsVersion"] = gsVersion
+    params["gsRepo"] = gsRepo
+    params["gsPath"] = gsPath
+    
+    params["filename"] = filename
+    params["filemap"] = filemap    
     
     # #FIXME 
     # # Methods in the client's base.py are missing the response parse
@@ -137,100 +199,127 @@ def parse_args(argv):
 
 
 if __name__ == '__main__':
-    #python3 template_tester.py --templateInfo=workflow_files/template_map.json --projectId=2aa4e5e69e49703961f2af4c5e000dd1
+    #python3 template_tester.py  --templateRepo=tercen/workflow_lib_repo --templateVersion=latest --templatePath=template_mean_crabs_2.zip --gsRepo=tercen/workflow_lib_repo --gsVersion=latest --gsPath=golden_standard_mean_crabs_2.zip --projectId=2aa4e5e69e49703961f2af4c5e000dd1 --filename="Crabs DataB.csv"
 
     absPath = os.path.dirname(os.path.abspath(__file__))
     
     params = parse_args(sys.argv[1:])
+    client = params["client"]
     
-    # DEFAULT
-    workflowInfo = {"verbose":True, "toleranceType":"relative","tolerance":0.001,"operators":[], 
-                "tableStepFiles":[{"stepId":"", "filename":""}]}
-    
-    if hasattr(workflowInfo, "verbose"):
-        verbose = bool(workflowInfo["verbose"])
-    else:
-        verbose = False
+    # Download template workflow
+    gitCmd = 'https://github.com/{}/raw/{}/{}'.format(params["templateRepo"], params["templateVersion"],params["templatePath"])
+    # tmpDir = "{}/{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
+    tmpDir = "data"
 
-        
-    # Add to params
+    zipFilePath = "{}/{}".format(tmpDir, params["templatePath"].split("/")[-1])
+
+    #os.mkdir(tmpDir)
+
+    subprocess.call(['wget', '-O', zipFilePath, gitCmd])
+    subprocess.run(["unzip", '-qq', '-d', tmpDir, '-o', zipFilePath])
+
+    zip  = ZipFile(zipFilePath)
+    currentZipFolder = zip.namelist()[0]
+    project = client.projectService.get(params["projectId"])
+
+
+    with open( "{}/{}/workflow.json".format(tmpDir, currentZipFolder) ) as wf:
+        wkfJson = json.load(wf)
+        wkf = Workflow.createFromJson( wkfJson )
+        wkf.projectId = project.id
+        wkf.acl = project.acl
+        #params["templateWorkflow"] = wkf
+
+
+    # FIXME Take DEFAULT values as parameters
+    verbose = params["verbose"]
+
     resultList = []
 
     msg( "Starting Workflow Runner.", verbose )
-    msg( "Testing template {}.".format(params["templateInfo"]["templateName"]), verbose )
-    for wkfParams in params["templateInfo"]["workflows"]:
-        if wkfParams["version"] == 'latest':
-            version = 'main'
-           
-        else:
-            version = wkfParams["version"]
+    msg( "Testing template {}/{}.".format(params["templateRepo"], params["templatePath"]), verbose )
+
+    # for wkfParams in params["templateInfo"]["workflows"]:
+    # if wkfParams["version"] == 'latest':
+    #     version = 'main'
         
-        #git -c 'versionsort.suffix=-' ls-remote --tags --sort='v:refname' https://github.com/tercen/tercen | tail --lines=1 | cut --delimiter='       ' --fields=1
+    # else:
+    #     version = wkfParams["version"]
 
-        #-O ./data/some_workflow.zip
-        #https://github.com/tercen/workflow_runner/blob/a442105f74371285c49572148deb024436176ef8/workflow_files/reference_workflow.zip
-        gitCmd = 'https://github.com/{}/raw/{}/{}'.format(wkfParams["repo"], version,wkfParams["goldenStandard"])
+    workflows = create_test_workflow(client, wkf, params, verbose=verbose)
+    workflow = workflows[0]
+    refWorkflow = workflows[1]
 
-        # tmpDir = "{}/{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
-        tmpDir = "data"
-
-        zipFilePath = "{}/{}".format(tmpDir, wkfParams["goldenStandard"].split("/")[-1])
-
-        #os.mkdir(tmpDir)
-
-        subprocess.call(['wget', '-O', zipFilePath, gitCmd])
-        subprocess.run(["unzip", '-d', tmpDir, '-o', zipFilePath])
-
-        zip  = ZipFile(zipFilePath)
-        currentZipFolder = zip.namelist()[0]
-
-        
-
-
-
-        
-        client = params["client"]
-        msg( "Testing workflow {}/{}".format(wkfParams["repo"], wkfParams["goldenStandard"]), verbose )
-
-        project = client.projectService.get(params["projectId"])
-
-
-        zip  = ZipFile(zipFilePath)
-        currentZipFolder = zip.namelist()[0]
+    #if refWorkflow == None:
+    #    refWorkflow = client.workflowService.get(workflowInfo["workflowId"])
     
+    if params["filemap"] == None:
+        filemap = params["filename"]
+    else:
+        filemap = params["filemap"]
+
+    try:
+        update_table_relations(client, refWorkflow, workflow, filemap, params["user"], verbose=verbose)
+    except FileNotFoundError as e:
+        print(e)
+        workflow.steps = []
+        client.workflowService.update(workflow)
+        client.workflowService.delete(workflow.id, workflow.rev)
+        sys.exit(1)
+
+    msg("Running all steps", verbose)
+
+
+    run_workflow(workflow, project, client)
+    msg("Finished", verbose)
+
+    # Retrieve the updated, ran workflow
+    workflow = client.workflowService.get(workflow.id)
+
+            # #git -c 'versionsort.suffix=-' ls-remote --tags --sort='v:refname' https://github.com/tercen/tercen | tail --lines=1 | cut --delimiter='       ' --fields=1
+
+    # #-O ./data/some_workflow.zip
+    # #https://github.com/tercen/workflow_runner/blob/a442105f74371285c49572148deb024436176ef8/workflow_files/reference_workflow.zip
+    gitCmd = 'https://github.com/{}/raw/{}/{}'.format(params["gsRepo"], params["gsVersion"],params["gsPath"])
+
+    # # tmpDir = "{}/{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
+    tmpDir = "data"
+
+    zipFilePath = "{}/{}".format(tmpDir, params["gsPath"].split("/")[-1])
+
+    # #os.mkdir(tmpDir)
+    subprocess.call(['wget', '-O', zipFilePath, gitCmd])
+    subprocess.run(["unzip", '-qq', '-d', tmpDir, '-o', zipFilePath])
+
+    zip  = ZipFile(zipFilePath)
+    currentZipFolder = zip.namelist()[0]
+
+
+    with open( "{}/{}/workflow.json".format(tmpDir, currentZipFolder) ) as wf:
+        wkfJson = json.load(wf)
+        gsWkf = Workflow.createFromJson( wkfJson )
+        gsWkf.projectId = project.id
+        gsWkf.acl = project.acl
 
     
-
-        with open( "{}/{}/workflow.json".format(tmpDir, currentZipFolder) ) as wf:
-            wkfJson = json.load(wf)
-            wkf = Workflow.createFromJson( wkfJson )
-            params["workflow"] = wkf
-
-        wkf.projectId = project.id
-        wkf.acl = project.acl
-
-        workflows = create_test_workflow(client, wkf, workflowInfo, verbose=verbose)
-        workflow = workflows[0]
-        refWorkflow = workflows[1]
-
-        params["referenceSchemaPath"] = "{}/{}/data/".format(tmpDir, currentZipFolder)
-
-        update_table_relations(client, refWorkflow, workflow, wkfParams, params["user"], verbose=verbose)
-
-        msg("Running all steps", workflowInfo["verbose"])
+    # msg( "Testing workflow {}/{}".format(wkfParams["repo"], wkfParams["goldenStandard"]), verbose )
 
 
-        run_workflow(workflow, project, client)
-        msg("Finished", workflowInfo["verbose"])
+    # zip  = ZipFile(zipFilePath)
+    # currentZipFolder = zip.namelist()[0]
+    params["referenceSchemaPath"] = "{}/{}/data/".format(tmpDir, currentZipFolder)
 
-        # Retrieve the updated, ran workflow
-        workflow = client.workflowService.get(workflow.id)
 
-        resultDict = diff_workflow(client, workflow, refWorkflow, params["referenceSchemaPath"], workflowInfo["tolerance"],
-                                workflowInfo["toleranceType"], workflowInfo["verbose"])
+
+    # wkf.projectId = project.id
+    # wkf.acl = project.acl
+
+    try:
+        resultDict = diff_workflow(client, workflow, gsWkf, params["referenceSchemaPath"], params["tolerance"],
+                                params["toleranceType"], verbose)
 
         resultList.append(resultDict)
-
+    finally:
         client.workflowService.delete(workflow.id, workflow.rev)
 
         

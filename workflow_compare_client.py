@@ -65,7 +65,7 @@ def compare_columns_metadata(colNames, refColNames):
 
     return results
 
-def compare_table(client,jop, refJop, referenceSchemaPath, tol=0, tolType="Absolute"):
+def compare_table(client, tableIdx, jop, refJop, referenceSchemaPath, tol=0, tolType="Absolute"):
     tableRes = {}
     hasDiff = False
 
@@ -123,7 +123,7 @@ def compare_table(client,jop, refJop, referenceSchemaPath, tol=0, tolType="Absol
         hasDiff = True
         #TODO Try to get table name here... 
         tableRes["NumRows"] = "Number rows tables do not match for Table {:d} : {:d} x {:d} (Reference vs Workflow)".format(
-            1, #k + 1,
+            tableIdx+1, #k + 1,
             refTbl.shape[0],
             schema.nRows 
         )
@@ -213,7 +213,7 @@ def compare_table(client,jop, refJop, referenceSchemaPath, tol=0, tolType="Absol
     
 
 #FIXME Not comparing Gather and Join steps at the moment
-def compare_step(client, stp, refStp, referenceSchemaPath, tol=0, tolType="absolute", tableComp=[], verbose=False):
+def compare_step(client, tableIdx, stp, refStp, referenceSchemaPath, tol=0, tolType="absolute", tableComp=[], verbose=False):
     stepResult = {}
     # NOTE Possibly unnecessary, but input data might change
     if(isinstance(stp, TableStep)):
@@ -286,7 +286,7 @@ def compare_step(client, stp, refStp, referenceSchemaPath, tol=0, tolType="absol
                 for k in range(0, len(joinOps)):
                     jop = joinOps[k]
                     refJop = refJoinOps[k]
-                    res = compare_table(client,jop, refJop, referenceSchemaPath, tol)
+                    res = compare_table(client, tableIdx, jop, refJop, referenceSchemaPath, tol)
                     tableRes = res[0]
                     hasDiff = res[1]
                     
@@ -295,19 +295,24 @@ def compare_step(client, stp, refStp, referenceSchemaPath, tol=0, tolType="absol
                         
 
                     if hasDiff == True:
-                        tableRes["TableIdx"]:k+1
+                        tableRes["TableIdx"]:tableIdx+1
 
                         stepResult = {**stepResult, **tableRes}
     return stepResult
 
 def diff_workflow(client, workflow, refWorkflow, referenceSchemaPath, tol=0, tolType="absolute", verbose=False):
     resultDict = {}
-    for i in range(0, len(workflow.steps)):
-        stp = workflow.steps[i]
-        refStp = refWorkflow.steps[i]
 
-        stepRes = compare_step(client, stp, refStp, referenceSchemaPath, tol, tolType, verbose)
-        resultDict = {**resultDict, **stepRes}
+    if len(workflow.steps) != len(refWorkflow.steps):
+        resultDict["NumOfSteps"] = ["Number of steps between workflow and template are not equal: {} x {}".format(len(workflow.steps),  len(refWorkflow.steps))]
+
+    for i in range(0, len(workflow.steps)):
+        if i < len(workflow.steps) and i < len(refWorkflow.steps):
+            stp = workflow.steps[i]
+            refStp = refWorkflow.steps[i]
+
+            stepRes = compare_step(client, i, stp, refStp, referenceSchemaPath, tol, tolType, verbose)
+            resultDict = {**resultDict, **stepRes}
 
         
 

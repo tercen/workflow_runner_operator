@@ -39,8 +39,8 @@ def parse_args(argv):
                                ["templateInfo=", 
                                 "templateVersion=", "templateRepo=", "templatePath=",
                                 "gsVersion=", "gsRepo=", "gsPath=",
-                                "serviceUri=", "projectId=",
-                                "user=", "passw=", "authToken=", "dataset=", "datasetMap=", "verbose",
+                                "serviceUri=", 
+                                "user=", "passw=", "authToken=", "verbose",
                                 "tolerance=", "toleranceType=",
                                 "filename=", "filemap="])
     
@@ -51,21 +51,19 @@ def parse_args(argv):
 
     serviceUri = 'http://127.0.0.1'
     servicePort = '5400'
-    templateRepo = 'tercen/workflow_lib_repo'
+    templateRepo = None #'tercen/workflow_lib_repo'
     templateVersion = 'main'
-    templatePath = 'template_mean_crabs_2.zip'
+    templatePath = None # 'template_mean_crabs_2.zip'
     
 
-    gsRepo = 'tercen/workflow_lib_repo'
+    gsRepo = None #'tercen/workflow_lib_repo'
     gsVersion = 'main'
-    gsPath = 'golden_standard_mean_crabs_2.zip'
+    gsPath = None #'golden_standard_mean_crabs_2.zip'
     
 
-    projectId = ''
     user = 'test'
     passw = 'test'
     authToken = ''
-    confFilePath = ''
     verbose = False
     
     tolerance = 0.001
@@ -129,9 +127,6 @@ def parse_args(argv):
         if opt == '--authToken':
             authToken = arg
 
-        if opt == '--confFilePath':
-            confFilePath = arg
-
         if opt == '--tolerance':
             tolerance = float(arg)
 
@@ -156,7 +151,7 @@ def parse_args(argv):
     params["client"] = client
     params["user"] = user
     params["projectId"] = projectId
-    params["confFilePath"] = confFilePath
+
     params["verbose"] = verbose
     params["tolerance"] = tolerance
     params["toleranceType"] = toleranceType

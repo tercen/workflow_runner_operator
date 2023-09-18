@@ -1,42 +1,56 @@
 
 # Workflow Runner
 
-Repo responsible for cloning and running workflows from a CLI. 
+Set of scripts to test workflows against previously ran versions of it. 
 
-Through the configuration file, the user can change operators and their versions, input files, as well as set tolerance ranges for output comparisons.
 
-Finally, if the comparison is successful, the updated version of the workflow may replace the older reference workflow.
+### List of Parameters
 
-### Configuration file
+#### Connection & Credentials 
 
-Below is an example configuration JSON file with all available fields.
+| PARAMETER | DEFAULT VALUE | DESCRIPTION |
+|-----------------------------------------|
+| user | test | Tercen username |
+| passw | test | Tercen password |
+| authToken | - | Authorization token to be used instead of password |
+| serviceUri | http://127.0.0.1 | Tercen URI where the runner will execute the tests |
+| servicePort | 5400 | Tercen instance port |
 
-```JSON
-{
-    "workflowId":"57cffa7f7a5cfd889a797ae40005206d",
-    "updateOnSuccess":"False",
-    "outputArtifact":"run_all_report.json",
-    "toleranceType":"absolute",
-    "tolerance":0.02,
-    "verbose":"True",
-    "tableStepFiles":[{
-        "stepId":"7f856005-341a-4543-a6f1-01d2c242aa45",
-        "fileId":"57cffa7f7a5cfd889a797ae40005388d"
-    }],
-    "operators":[{
-        "stepId":"b47e85ae-76c7-469d-80f5-f19a56fb7469",
-        "operatorURL":"https://github.com/tercen/mean_operator",
-        "version":"1.2.0"
-    }]
-}
+
+#### Template & Golden Standard
+
+| PARAMETER | DEFAULT VALUE | DESCRIPTION |
+|-----------------------------------------|
+| templateRepo | - | Github template repository (e.g. tercen/workflow_lib)  |
+| templateVersion | latest | Template version or commit id |
+| templatePath | - | Template path, up to filename (e.g. data/template.zip) |
+| gsRepo | - | Github golden standard repository (e.g. tercen/workflow_lib)  |
+| gsVersion | latest | golden standard version or commit id |
+| gsPath | - | golden standard path, up to filename (e.g. data/gs.zip) |
+
+
+#### Other parameters
+
+| PARAMETER | DEFAULT VALUE | DESCRIPTION |
+|-----------------------------------------|
+| filename | - | Name of a file stored in Tercen to be passed to Table Steps. *  |
+| filemap | - | Local JSON file mapping TableStep ids and Tercen file Ids. *  |
+| verbose | - | Switch. If present, print information messages.  |
+
+\* If neither a filename nor filemap are provided, a file with the same name as the TableStep will be used.
+
+
+### Example Calls
+
+#### Test a template against a golden standard
+
+```Bash
+ python3 template_tester.py  --templateRepo=tercen/workflow_lib_repo --templateVersion=latest --templatePath=template_mean_crabs_2.zip --gsRepo=tercen/workflow_lib_repo --gsVersion=latest --gsPath=golden_standard_mean_crabs_2.zip 
 ```
 
-```workflowId``` refers to the reference workflow. Must have been previously run.
-```updateOnSuccess``` Should the reference workflow be replaced by the new one in case of successful run.
-```toleranceType``` Relative, Absolute or Equality. How column values should be compared
-```tolerance``` The tolerance value. Ignored in case of Equality type
-```verbose``` Print debug messages
-```tableStepFiles``` List of objects containing the ```stepId``` of a TableStep and a ```fileId``` of the associated file. If not specified, use the same file as the reference workflow.
-```operators``` List of objects containing the ```stepId``` of a DataStep where the operator will be updated by the one defined in ```operatorURL``` and ```version```
+
+
+
+
 
     

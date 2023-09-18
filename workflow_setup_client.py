@@ -235,14 +235,27 @@ def __get_file_id(client, user, tbf):
 
         return doc.id
 
+
 # Separate function for legibility
 def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose=False):
     msg("Setting up table step references in new workflow.", verbose)
     if refWorkflow == None:
         refWorkflow = client.workflowService.get(workflowInfo["workflowId"])
 
-    #tableStepFiles = workflowInfo["tableStepFiles"]
-    if isinstance(filemap, str): #len(tableStepFiles) == 1 and tableStepFiles[0]["stepId"] == "":
+    
+    if filemap == None:
+        # No filename of tableStep <-> filename association has been given
+        # Trying to derive it from the table step name
+        for i in range(0, len(refWorkflow.steps)):
+            if isinstance(refWorkflow.steps[i], TableStep):
+                stp = refWorkflow.steps[i]
+                filename = {"filename":stp.name} # This is not necessarily so
+                fileId = __get_file_id(client, user, filename)
+                rr = __file_relation(client, fileId)
+                workflow.steps[i].model.relation = rr
+                workflow.steps[i].state.taskState = DoneState()
+
+    elif isinstance(filemap, str): 
         for i in range(0, len(workflow.steps)):
             filemap = {"filename":filemap}
             if isinstance(workflow.steps[i], TableStep):
@@ -253,7 +266,6 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
                 workflow.steps[i].state.taskState = DoneState()
     else:
         for tbf in filemap:
-            
             tblStepIdx = which([stp.id == tbf["stepId"] for stp in workflow.steps])
             if not (isinstance(tblStepIdx, int) or len(tblStepIdx) > 0):
                 continue

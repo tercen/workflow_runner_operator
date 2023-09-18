@@ -16,9 +16,8 @@ from workflow_compare_client import diff_workflow
 from workflow_stats import stats_workflow
 
 from tercen.client.factory import TercenClient
-from tercen.client import context as tercen
 
-from tercen.model.base import RunWorkflowTask, InitState, DoneState, Workflow, TableSchema, Relation
+from tercen.model.base import RunWorkflowTask, InitState,  Workflow, Project
 
 
 def run_workflow(workflow, project, client):
@@ -47,15 +46,20 @@ def parse_args(argv):
     
 # workflowInfo = {"verbose":True, "toleranceType":"relative","tolerance":0.001,"operators":[], 
                 # "tableStepFiles":[{"stepId":"", "filename":""}]}
+
+#python3 template_tester.py  --templateRepo=tercen/workflow_lib_repo --templateVersion=latest --templatePath=template_mean_crabs_2.zip  --gsRepo=tercen/workflow_lib_repo --gsVersion=latest --gsPath=golden_standard_mean_crabs_2.zip 
+
     serviceUri = 'http://127.0.0.1'
     servicePort = '5400'
-    templateRepo = ''
-    templatePath = ''
-    templateVersion = ''
+    templateRepo = 'tercen/workflow_lib_repo'
+    templateVersion = 'main'
+    templatePath = 'template_mean_crabs_2.zip'
+    
 
-    gsRepo = ''
-    gsPath = ''
-    gsVersion = ''
+    gsRepo = 'tercen/workflow_lib_repo'
+    gsVersion = 'main'
+    gsPath = 'golden_standard_mean_crabs_2.zip'
+    
 
     projectId = ''
     user = 'test'
@@ -144,9 +148,6 @@ def parse_args(argv):
             
             
 
-    #with open(templateInfo) as f:
-    #    templateInfo = json.load(f)
-    #params["templateInfo"] = templateInfo
     serviceUri = '{}:{}'.format(serviceUri, servicePort)
 
     client = TercenClient(serviceUri)
@@ -172,11 +173,11 @@ def parse_args(argv):
     params["gsPath"] = gsPath
     
     params["filename"] = filename
-    print(filemap)
-    with open(filemap) as f:
-        params["filemap"] = json.load(f)
     
-    # #FIXME 
+    if filemap != None and os.path.exists(filemap):
+        with open(filemap) as f:
+            params["filemap"] = json.load(f)
+        
     # # Methods in the client's base.py are missing the response parse
     # # Se library calls like the one below are not working.
     # # This must be changed in future version, both in the client and here
@@ -222,6 +223,17 @@ if __name__ == '__main__':
 
     zip  = ZipFile(zipFilePath)
     currentZipFolder = zip.namelist()[0]
+
+
+    # Create temp project to run tests
+
+    project = Project()
+    project.name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
+    project.name = 'template_test_' + project.name
+    project.acl.owner = params['user']
+    project = client.projectService.create(project)
+    params["projectId"] = project.id
+
     project = client.projectService.get(params["projectId"])
 
 
@@ -241,27 +253,23 @@ if __name__ == '__main__':
     msg( "Starting Workflow Runner.", verbose )
     msg( "Testing template {}/{}.".format(params["templateRepo"], params["templatePath"]), verbose )
 
-    # for wkfParams in params["templateInfo"]["workflows"]:
-    # if wkfParams["version"] == 'latest':
-    #     version = 'main'
-        
-    # else:
-    #     version = wkfParams["version"]
-
     workflows = create_test_workflow(client, wkf, params, verbose=verbose)
     workflow = workflows[0]
     refWorkflow = workflows[1]
 
-    #if refWorkflow == None:
-    #    refWorkflow = client.workflowService.get(workflowInfo["workflowId"])
+
     
-    if params["filemap"] == None:
+    if "filemap" in params and params["filemap"] != None:
+        filemap = params["filemap"]
+    elif "filename" in params and params["filename"] != None:
         filemap = params["filename"]
     else:
-        filemap = params["filemap"]
+        filemap = None
+        
 
     try:
         update_table_relations(client, refWorkflow, workflow, filemap, params["user"], verbose=verbose)
+        
     except FileNotFoundError as e:
         print(e)
         workflow.steps = []
@@ -337,6 +345,8 @@ if __name__ == '__main__':
             shutil.rmtree(f)
         else:
             os.unlink(f)
+
+    client.teamService.delete(project.id, project.rev)
     
 
 

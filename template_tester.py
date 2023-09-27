@@ -53,7 +53,7 @@ def parse_args(argv):
     servicePort = '5400'
     templateRepo = None #'tercen/workflow_lib_repo'
     templateVersion = 'main'
-    templatePath = None # 'template_mean_crabs_2.zip'
+    templatePath =  None #'template_mean_crabs_2.zip'
     
 
     gsRepo = None #'tercen/workflow_lib_repo'
@@ -70,7 +70,7 @@ def parse_args(argv):
     toleranceType="relative"
 
     # TODO Add the file mapping parse for multiple table steps situation
-    filename=None
+    filename=None #"Crabs Data.csv"
     filemap=None 
 
     
@@ -105,9 +105,6 @@ def parse_args(argv):
 
         if opt == '--gsPath':
             gsPath = arg
-
-        if opt == '--projectId':
-            projectId = arg
 
         if opt == '--serviceUri':
             serviceUri = arg
@@ -150,7 +147,7 @@ def parse_args(argv):
 
     params["client"] = client
     params["user"] = user
-    params["projectId"] = projectId
+
 
     params["verbose"] = verbose
     params["tolerance"] = tolerance
@@ -176,7 +173,7 @@ def parse_args(argv):
     # # Methods in the client's base.py are missing the response parse
     # # Se library calls like the one below are not working.
     # # This must be changed in future version, both in the client and here
-    # # print(client.documentService.getTercenDatasetLibrary(0,100) )
+    
     # #
     # # Also, this methods returns a TableSchema without id
     # from tercen.http.HttpClientService import HttpClientService, URI, encodeTSON, decodeTSON, MultiPart, MultiPartMixTransformer, URI
@@ -204,6 +201,22 @@ if __name__ == '__main__':
     params = parse_args(sys.argv[1:])
     client = params["client"]
     
+
+    
+    # Create temp project to run tests
+
+    project = Project()
+    project.name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
+    project.name = 'template_test_' + project.name
+    project.acl.owner = params['user']
+    project = client.projectService.create(project)
+    params["projectId"] = project.id
+
+    project = client.projectService.get(params["projectId"])
+
+    # # 
+
+
     # Download template workflow
     gitCmd = 'https://github.com/{}/raw/{}/{}'.format(params["templateRepo"], params["templateVersion"],params["templatePath"])
     # tmpDir = "{}/{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
@@ -220,16 +233,7 @@ if __name__ == '__main__':
     currentZipFolder = zip.namelist()[0]
 
 
-    # Create temp project to run tests
 
-    project = Project()
-    project.name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
-    project.name = 'template_test_' + project.name
-    project.acl.owner = params['user']
-    project = client.projectService.create(project)
-    params["projectId"] = project.id
-
-    project = client.projectService.get(params["projectId"])
 
 
     with open( "{}/{}/workflow.json".format(tmpDir, currentZipFolder) ) as wf:

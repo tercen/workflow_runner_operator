@@ -4,6 +4,8 @@ import json
 
 import copy
 
+
+
 from datetime import datetime
 
 sys.path.append('./')
@@ -14,14 +16,15 @@ from util import msg, which
 
 
 from tercen.model.base import *
+from tercen.model.base import FileDocument,  InitState,  ImportGitDatasetTask
 from tercen.client import context as tercen
 
 import numpy as np
-from fpdf import FPDF
+
 from datetime import datetime
 
-import tercen.http.HttpClientService as th
 import tercen.util.helper_functions as utl
+from pytson import encodeTSON
 
 import polars as pl
 
@@ -216,24 +219,68 @@ def __file_relation(client, fileId):
     return rr
 
 
-def __get_file_id(client, user, tbf):
+def __get_file_id(client, user, tbf, projectId):
 
     if "fileId" in tbf:
         return tbf["fileId"]
     else:
-        docs = client.projectDocumentService.findSchemaByOwnerAndLastModifiedDate(user, "")
-        docComp = [doc.name == tbf["filename"] for doc in docs]
-        if len(docs) == 0 or not np.any(docComp):
-            raise FileNotFoundError("!!ERROR!! Document {} not found. Cannot set TableStep, so aborting execution.".format(tbf["filename"]))
-        idx = which(docComp)
+        # 1: Search for the filename in the dataset library
+        dsLib = client.documentService.getTercenDatasetLibrary(0, 100)
 
-        # TODO Abort if filename does not exist
-        if isinstance(idx, list):
-            doc = docs[idx[0]]
+        fileDoc = None
+        for l in dsLib:
+            if l.name == tbf["filename"]:
+                fileDoc = l
+                break
+
+        if not fileDoc == None:
+            gitTask = ImportGitDatasetTask()
+            gitTask.state = InitState()
+            gitTask.gitToken = os.environ["GITHUB_TOKEN"]
+            gitTask.projectId = projectId
+            gitTask.url = fileDoc.url
+            gitTask.version = fileDoc.version
+            gitTask.owner = user
+
+            gitTask = client.taskService.create( gitTask )
+            client.taskService.runTask(gitTask.id)
+            gitTask = client.taskService.waitDone(gitTask.id)
+
+            return gitTask.schemaId
         else:
-            doc = docs[idx]
+            docs = client.projectDocumentService.findSchemaByOwnerAndLastModifiedDate(user, "")
+            docComp = [doc.name == tbf["filename"] for doc in docs]
+            if len(docs) == 0 or not np.any(docComp):
+                #TODO Try to find the document in the dataset library
+                tercenDocs = client.documentService.getTercenDatasetLibrary(0,100)
+                docComp = [doc.name == tbf["filename"] for doc in docs]
 
-        return doc.id
+                if len(tercenDocs) == 0 or not np.any(docComp):
+                    raise FileNotFoundError("!!ERROR!! Document {} not found. Cannot set TableStep, so aborting execution.".format(tbf["filename"]))
+                else:
+                    # upload it to the project
+                    #doc = tercenDocs[which(docComp)[0]]
+                    doc = tercenDocs[0]
+
+                    
+                    file = FileDocument()
+                    file.name = doc.name
+                    file.acl.owner = user
+                    file.projectId = projectId
+                    # bytes_data = encodeTSON(doc.toJson()).getvalue()
+                    file = client.fileService.uploadTable(file, doc.toJson())
+                    client.d
+
+                    pass
+            idx = which(docComp)
+
+            # TODO Abort if filename does not exist
+            if isinstance(idx, list):
+                doc = docs[idx[0]]
+            else:
+                doc = docs[idx]
+
+            return doc.id
 
 
 # Separate function for legibility
@@ -250,7 +297,7 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
             if isinstance(refWorkflow.steps[i], TableStep):
                 stp = refWorkflow.steps[i]
                 filename = {"filename":stp.name} # This is not necessarily so
-                fileId = __get_file_id(client, user, filename)
+                fileId = __get_file_id(client, user, filename, workflow.projectId)
                 rr = __file_relation(client, fileId)
                 workflow.steps[i].model.relation = rr
                 workflow.steps[i].state.taskState = DoneState()
@@ -260,7 +307,7 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
             filemap = {"filename":filemap}
             if isinstance(workflow.steps[i], TableStep):
                 #print( tableStepFiles[0])
-                fileId = __get_file_id(client, user, filemap)
+                fileId = __get_file_id(client, user, filemap, workflow.projectId)
                 rr = __file_relation(client, fileId)
                 workflow.steps[i].model.relation = rr
                 workflow.steps[i].state.taskState = DoneState()

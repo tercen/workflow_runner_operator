@@ -10,6 +10,12 @@
                      "ms-toolsai.jupyter-keymap", "ms-toolsai.jupyter-renderers", "ms-azuretools.vscode-docker"]
     }
   },
+  "containerEnv": {
+    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
+  },
+  "remoteEnv": {
+    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
+  },
   
   "postCreateCommand": "python3 -m pip install -r requirements.txt"
   // If any local folders, beside the project, is needed

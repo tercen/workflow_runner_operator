@@ -47,18 +47,19 @@ def parse_args(argv):
 # workflowInfo = {"verbose":True, "toleranceType":"relative","tolerance":0.001,"operators":[], 
                 # "tableStepFiles":[{"stepId":"", "filename":""}]}
 
-#python3 template_tester.py  --templateRepo=tercen/workflow_lib_repo --templateVersion=latest --templatePath=template_mean_crabs_2.zip  --gsRepo=tercen/workflow_lib_repo --gsVersion=latest --gsPath=golden_standard_mean_crabs_2.zip 
-
+    #python3 template_tester.py  --templateRepo=tercen/workflow_lib_repo --templateVersion=latest --templatePath=template_mean_crabs_2.zip  
+    # --gsRepo=tercen/workflow_lib_repo --gsVersion=latest --gsPath=golden_standard_mean_crabs_2.zip 
+    
     serviceUri = 'http://127.0.0.1'
     servicePort = '5400'
-    templateRepo = None #'tercen/workflow_lib_repo'
+    templateRepo = "tercen/scRNAseq_basic_template_test" #'tercen/workflow_lib_repo'
     templateVersion = 'main'
     templatePath =  None #'template_mean_crabs_2.zip'
     
 
-    gsRepo = None #'tercen/workflow_lib_repo'
+    gsRepo = "tercen/scRNAseq_basic_template_test" #'tercen/workflow_lib_repo'
     gsVersion = 'main'
-    gsPath = None #'golden_standard_mean_crabs_2.zip'
+    gsPath = 'tests/example_test_gs.zip'
     
 
     user = 'test'
@@ -70,7 +71,7 @@ def parse_args(argv):
     toleranceType="relative"
 
     # TODO Add the file mapping parse for multiple table steps situation
-    filename=None #"Crabs Data.csv"
+    filename="file:/workspaces/workflow_runner/in_data/cellranger_example_data.zip" #None #"Crabs Data.csv"
     filemap=None 
 
     
@@ -214,23 +215,42 @@ if __name__ == '__main__':
 
     project = client.projectService.get(params["projectId"])
 
-    # # 
-
-
     # Download template workflow
-    gitCmd = 'https://github.com/{}/raw/{}/{}'.format(params["templateRepo"], params["templateVersion"],params["templatePath"])
-    # tmpDir = "{}/{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
-    tmpDir = "data"
+    if params["templatePath"] == None:
+        # Template repo, only latest version and main branch
+        gitCmd = 'https://github.com/{}'.format(params["templateRepo"])
+        tmpDir = "data"
+        zipFilePath = "{}/{}".format(tmpDir, params["templateRepo"].split("/")[-1])
 
-    zipFilePath = "{}/{}".format(tmpDir, params["templatePath"].split("/")[-1])
+        if params["templateVersion"] == "main" or params["templateVersion"] == "latest":
+            subprocess.call(['git','clone', gitCmd, zipFilePath])
+        else:
+            pass
+            exit(1)
+            #subprocess.call(['git','clone', '--bare', gitCmd, zipFilePath])
+            subprocess.call(['git','log', '-p', zipFilePath])
+            # History of versions... if latest, get the full repo actually
+            # git log -p -- tests/example_test_gs.zip
+            subprocess.call(['git','clone', '--bare', gitCmd, zipFilePath])
 
-    #os.mkdir(tmpDir)
 
-    subprocess.call(['wget', '-O', zipFilePath, gitCmd])
-    subprocess.run(["unzip", '-qq', '-d', tmpDir, '-o', zipFilePath])
+        currentZipFolder = params["templateRepo"].split("/")[-1]
+    else:
+        # Template or golden standard is a zip file
+        gitCmd = 'https://github.com/{}/raw/{}/{}'.format(params["templateRepo"], params["templateVersion"],params["templatePath"])
+        # tmpDir = "{}/{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
+        tmpDir = "data"
 
-    zip  = ZipFile(zipFilePath)
-    currentZipFolder = zip.namelist()[0]
+        zipFilePath = "{}/{}".format(tmpDir, params["templatePath"].split("/")[-1])
+
+        #os.mkdir(tmpDir)
+
+        subprocess.call(['wget', '-O', zipFilePath, gitCmd])
+        subprocess.run(["unzip", '-qq', '-d', tmpDir, '-o', zipFilePath])
+
+        zip  = ZipFile(zipFilePath)
+        currentZipFolder = zip.namelist()[0]
+
 
 
 

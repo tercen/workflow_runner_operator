@@ -1,4 +1,4 @@
-import os 
+import os , io
 import sys
 import json
 
@@ -16,7 +16,7 @@ from util import msg, which
 
 
 from tercen.model.base import *
-from tercen.model.base import FileDocument,  InitState,  ImportGitDatasetTask
+from tercen.model.base import FileDocument,  InitState,  ImportGitDatasetTask, RunComputationTask
 from tercen.client import context as tercen
 
 import numpy as np
@@ -82,14 +82,15 @@ def update_operators(workflow, refWorkflow, operatorList, client, verbose=False)
             #comp = [opTag ==  '{}@{}'.format(iop.url.uri, iop.version) for iop in installedOperators]
 
             # FIXME DEBUG from here
-            operator = get_installed_operator(client, installedOperators, opUrl, opVersion)
+            if opUrl != '':
+                operator = get_installed_operator(client, installedOperators, opUrl, opVersion)
 
 
 
-            workflow.steps[stpIdx].model.operatorSettings.operatorRef.operatorId = operator.id
-            workflow.steps[stpIdx].model.operatorSettings.operatorRef.name = operator.name
-            workflow.steps[stpIdx].model.operatorSettings.operatorRef.url = operator.url
-            workflow.steps[stpIdx].model.operatorSettings.operatorRef.version = operator.version
+                workflow.steps[stpIdx].model.operatorSettings.operatorRef.operatorId = operator.id
+                workflow.steps[stpIdx].model.operatorSettings.operatorRef.name = operator.name
+                workflow.steps[stpIdx].model.operatorSettings.operatorRef.url = operator.url
+                workflow.steps[stpIdx].model.operatorSettings.operatorRef.version = operator.version
 
 
 
@@ -249,9 +250,12 @@ def __get_file_id(client, user, tbf, projectId):
             return gitTask.schemaId
         else:
             docs = client.projectDocumentService.findSchemaByOwnerAndLastModifiedDate(user, "")
-            docComp = [doc.name == tbf["filename"] for doc in docs]
+            
+            fname = tbf["filename"].split("/")[-1]
+
+            docComp = [doc.name == fname for doc in docs]
             if len(docs) == 0 or not np.any(docComp):
-                #TODO Try to find the document in the dataset library
+                
                 tercenDocs = client.documentService.getTercenDatasetLibrary(0,100)
                 docComp = [doc.name == tbf["filename"] for doc in docs]
 
@@ -283,6 +287,116 @@ def __get_file_id(client, user, tbf, projectId):
             return doc.id
 
 
+def _get_install_operator(client, operatorName):
+    
+    pass
+
+def __upload_file_as_table(client, filename, projectId, user, cellranger=True):
+        
+        
+        if cellranger == True:
+            opList =client.documentService.getTercenOperatorLibrary(0,1)
+
+            crOpIdx = which(  [op.name == "Cell Ranger" for op in opList]  )
+            cellrangerOp = opList[crOpIdx]
+
+            with open(filename, 'rb') as file_data:
+                bytesData = file_data.read()
+
+            file = FileDocument()
+            file.name = filename.split("/")[-1]
+            file.acl.owner = user
+            file.projectId = projectId
+            
+            # with open("tmp.zip", 'wb') as zipFile:
+            #     zipFile.write(bytesData)
+
+
+
+            file = client.fileService.upload(file, bytesData)
+
+
+            pFile = FileDocument()
+            pFile.name = "documentIdFile"
+            pFile.acl.owner = user
+            pFile.projectId = projectId
+            
+            df = pl.DataFrame({"documentId":file.id})
+            pFile = client.fileService.uploadTable(pFile, utl.dataframe_to_table(df)[0].toJson())
+
+
+
+            query = CubeQuery()
+            col = Factor()
+            col.name = "documentId"
+            col.type = "string"
+            query.colColumns = [col]
+            rl = InMemoryRelation()
+            rl.inMemoryTable = utl.dataframe_to_table(pl.DataFrame({"documentId":[file.id]}), values_as_list=True)[0]
+            query.relation = rl
+            query.axisQueries = [CubeAxisQuery()]
+
+
+            installedOps = client.documentService.findOperatorByOwnerLastModifiedDate(user,"")
+            idx = which([o.name == cellrangerOp.name for o in installedOps])
+            if idx != []:
+                cellrangerOp = installedOps[idx] 
+
+            # ops = client.operatorService
+            opSettings = OperatorSettings()
+            opSettings.namespace = "ns001"
+
+            opRef = OperatorRef()
+            opRef.operatorId = cellrangerOp.id
+            opRef.operatorKind = str(cellrangerOp).split(".")[-1].split(" ")[0]
+            opRef.name = cellrangerOp.name
+            opRef.version = cellrangerOp.version
+            opSettings.operatorRef = opRef
+            query.operatorSettings = opSettings
+
+            rcTask = RunComputationTask()
+            rcTask.state = InitState()
+            rcTask.query = query
+            rcTask.owner = user
+            rcTask.projectId = projectId
+            #rcTask.fileResultId = file.id
+
+            rcTask = client.taskService.create( rcTask )
+            client.taskService.runTask(rcTask.id)
+            rcTask = client.taskService.waitDone(rcTask.id)
+
+            
+
+
+            return rcTask
+            
+            
+        else:
+            df = pl.read_csv(filename)
+            df = df.with_columns(pl.col(pl.INTEGER_DTYPES).cast(pl.Int32))
+            table = utl.dataframe_to_table(df)[0]
+
+            file = FileDocument()
+            file.name = filename.split("/")[-1]
+            file.acl.owner = user
+            file.projectId = projectId
+            # bytes_data = "hello\n\nhello\n\n42".encode("utf_8")
+            # file = self.client.fileService.upload(file, bytes_data)
+            file = client.fileService.uploadTable(file, table.toJson())
+
+            task = CSVTask()
+            task.state = InitState()
+            task.fileDocumentId = file.id
+            task.projectId = projectId
+            task.owner = user
+
+            task = client.taskService.create( task )
+            client.taskService.runTask(task.id)
+            csvTask = client.taskService.waitDone(task.id)
+
+            return None
+
+
 # Separate function for legibility
 def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose=False):
     msg("Setting up table step references in new workflow.", verbose)
@@ -302,15 +416,27 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
                 workflow.steps[i].model.relation = rr
                 workflow.steps[i].state.taskState = DoneState()
 
-    elif isinstance(filemap, str): 
+    elif isinstance(filemap, str):
+
+        if filemap.startswith("file:"):
+            #local file
+            filemap = filemap.split("file:")[-1]
+            res = __upload_file_as_table(client, filemap, workflow.projectId, user)
+            filemap = res.computedRelation
+
+        filemap = {"filename":filemap}
         for i in range(0, len(workflow.steps)):
-            filemap = {"filename":filemap}
+            
             if isinstance(workflow.steps[i], TableStep):
                 #print( tableStepFiles[0])
-                fileId = __get_file_id(client, user, filemap, workflow.projectId)
-                rr = __file_relation(client, fileId)
-                workflow.steps[i].model.relation = rr
-                workflow.steps[i].state.taskState = DoneState()
+                if isinstance(filemap["filename"], str):
+                    fileId = __get_file_id(client, user, filemap, workflow.projectId)
+                    rr = __file_relation(client, fileId)
+                    workflow.steps[i].model.relation = rr
+                    workflow.steps[i].state.taskState = DoneState()
+                else:
+                    workflow.steps[i].model.relation = filemap["filename"]
+                    workflow.steps[i].state.taskState = DoneState()
     else:
         for tbf in filemap:
             tblStepIdx = which([stp.id == tbf["stepId"] for stp in workflow.steps])
@@ -326,42 +452,3 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
 
     client.workflowService.update(workflow)
     
-if __name__ == '__main__':
-    print( "Running Workflow tests")
-
-    absPath = os.path.dirname(os.path.abspath(__file__))
-    
-    conf_path = os.path.join(absPath, 'env.conf')
-    json_path = os.path.join(absPath, 'workflow_files/run_all.json')
-    # json_path = os.path.join(absPath, 'workflow_files/debarcode_workflow.json')
-    # json_path = os.path.join(absPath, 'workflow_files/gather_join2.json')
-
-
-    username = 'test'
-    passw = 'test'
-    conf = {}
-
-    with open(conf_path) as f:
-        for line in f:
-            if len(line.strip()) > 0:
-                (key, val) = line.split(sep="=")
-                conf[str(key)] = str(val).strip()
-    serviceUri = ''.join([conf["SERVICE_URL"], ":", conf["SERVICE_PORT"]])
-
-    with open(json_path) as f:
-        workflowInfo = json.load(f) 
-
-    ctx = tercen.TercenContext(
-        username=username,
-        password=passw,
-        serviceUri=serviceUri,
-        workflowId=workflowInfo["workflowId"])
-    
-
-    
-    workflow = create_test_workflow(ctx, workflowInfo, workflowInfo["verbose"])
-
-    update_table_relations(ctx, workflow, workflowInfo, workflowInfo["verbose"])
-
-
-

@@ -253,7 +253,7 @@ def __get_file_id(client, user, tbf, projectId):
             
             fname = tbf["filename"].split("/")[-1]
 
-            docComp = [doc.name == fname for doc in docs]
+            docComp = [doc.name == fname and doc.projectId == projectId for doc in docs]
             if len(docs) == 0 or not np.any(docComp):
                 
                 tercenDocs = client.documentService.getTercenDatasetLibrary(0,100)
@@ -287,13 +287,10 @@ def __get_file_id(client, user, tbf, projectId):
             return doc.id
 
 
-def _get_install_operator(client, operatorName):
-    
-    pass
 
 def __upload_file_as_table(client, filename, projectId, user, cellranger=True):
         
-        
+        #FIXME Will likely be removed later
         if cellranger == True:
             opList =client.documentService.getTercenOperatorLibrary(0,1)
 
@@ -308,11 +305,6 @@ def __upload_file_as_table(client, filename, projectId, user, cellranger=True):
             file.acl.owner = user
             file.projectId = projectId
             
-            # with open("tmp.zip", 'wb') as zipFile:
-            #     zipFile.write(bytesData)
-
-
-
             file = client.fileService.upload(file, bytesData)
 
 
@@ -323,7 +315,6 @@ def __upload_file_as_table(client, filename, projectId, user, cellranger=True):
             
             df = pl.DataFrame({"documentId":file.id})
             pFile = client.fileService.uploadTable(pFile, utl.dataframe_to_table(df)[0].toJson())
-
 
 
             query = CubeQuery()
@@ -354,6 +345,8 @@ def __upload_file_as_table(client, filename, projectId, user, cellranger=True):
             opSettings.operatorRef = opRef
             query.operatorSettings = opSettings
 
+            
+
             rcTask = RunComputationTask()
             rcTask.state = InitState()
             rcTask.query = query
@@ -365,10 +358,19 @@ def __upload_file_as_table(client, filename, projectId, user, cellranger=True):
             client.taskService.runTask(rcTask.id)
             rcTask = client.taskService.waitDone(rcTask.id)
 
-            
+            #TODO Clean up
+            tableSchemas = __get_table_schemas(rcTask.computedRelation.joinOperators[0], client)
+            tableSchemas = utl.flatten(tableSchemas)
+            for ts in tableSchemas:
+                for col in ts.columns:
+                    if not str.startswith(col.name, "."):
+                        col.name = col.name.split(".")[-1]
+                        col.id = col.id.split(".")[-1]
 
 
-            return rcTask
+
+            return tableSchemas
+
             
             
         else:
@@ -396,6 +398,27 @@ def __upload_file_as_table(client, filename, projectId, user, cellranger=True):
 
             return None
 
+def __get_table_schemas(joinOp, client):
+    tss = client.tableSchemaService
+    tableSchemas = []
+    
+    if hasattr(joinOp , "rightRelation") and hasattr(joinOp.rightRelation , "mainRelation"):
+        msch = tss.get(joinOp.rightRelation.mainRelation.id)
+        cNames = [c.name for c in msch.columns]
+        dt = client.tableSchemaService.select(msch.id, cNames,0, msch.nRows)
+        tableSchemas.append( dt)
+
+    if hasattr(joinOp , "rightRelation") and isinstance(joinOp.rightRelation , SimpleRelation):
+        msch = tss.get(joinOp.rightRelation.id)
+        cNames = [c.name for c in msch.columns]
+        dt = client.tableSchemaService.select(msch.id, cNames,0, msch.nRows)
+        tableSchemas.append(dt)
+
+    if hasattr(joinOp , "rightRelation") and isinstance(joinOp.rightRelation , CompositeRelation):
+        for i in range(0, len(joinOp.rightRelation.joinOperators)):
+            tableSchemas.append(__get_table_schemas(joinOp.rightRelation.joinOperators[i], client))
+    
+    return tableSchemas
 
 # Separate function for legibility
 def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose=False):
@@ -422,7 +445,7 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
             #local file
             filemap = filemap.split("file:")[-1]
             res = __upload_file_as_table(client, filemap, workflow.projectId, user)
-            filemap = res.computedRelation
+            filemap = res#.computedRelation
 
         filemap = {"filename":filemap}
         for i in range(0, len(workflow.steps)):
@@ -435,8 +458,37 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
                     workflow.steps[i].model.relation = rr
                     workflow.steps[i].state.taskState = DoneState()
                 else:
-                    workflow.steps[i].model.relation = filemap["filename"]
+                    # List of table schemas
+                    rel = CompositeRelation()
+                    nTables = len(filemap["filename"])
+
+                    # "Main" Table --> Table 1
+                    jop = utl.as_join_operator(filemap["filename"][0], [], [])
+                    rel.joinOperators = [jop]
+
+                    #FIXME
+                    # Currently, only 3 tables handles
+                    # If this code remains, then this should be adjusted
+                    if nTables > 1:
+                        # Col & Row Tables
+                        rel.mainRelation = utl.as_composite_relation(filemap["filename"][0])
+                        
+
+                        cNames = set([c.name for c in filemap["filename"][0].columns]  )
+                        jops = []
+                        for k in range(1, nTables):
+                            cNames2 = set([c.name for c in filemap["filename"][k].columns]  )
+                            joinNames = cNames.intersection(cNames2)
+                            jops.append(utl.as_join_operator(filemap["filename"][k], list(joinNames), list(joinNames)))
+
+                        rel.mainRelation.joinOperators = jops
+                    else:
+                        rel.mainRelation = utl.as_relation(filemap["filename"][0])
+        
+                    #wkf = client.workflowService.get(workflow.id)
+                    workflow.steps[i].model.relation = rel # ur
                     workflow.steps[i].state.taskState = DoneState()
+        
     else:
         for tbf in filemap:
             tblStepIdx = which([stp.id == tbf["stepId"] for stp in workflow.steps])
@@ -451,4 +503,5 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
             workflow.steps[tblStepIdx].state.taskState = DoneState()
 
     client.workflowService.update(workflow)
+
     

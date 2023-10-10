@@ -9,7 +9,7 @@ from util import msg, which
 
 from tercen.model.base import *
 import numpy as np
-
+import tercen.util.helper_functions as utl
 import tercen.http.HttpClientService as th
 
 def isnumeric(val):
@@ -212,50 +212,71 @@ def compare_table(client, tableIdx, jop, refJop, referenceSchemaPath, tol=0, tol
     return [tableRes, hasDiff]
     
 
+def __get_colnames(cRel):
+    cnames = []
+
+    if isinstance(cRel.mainRelation, CompositeRelation):
+        cnames.append(__get_colnames(cRel.mainRelation))
+    else:
+        if isinstance(cRel.mainRelation, InMemoryRelation):
+            cnames.append([c.name for c in  cRel.mainRelation.inMemoryTable.columns])
+            cnames = utl.flatten(cnames)
+
+    for jop in cRel.joinOperators:
+        if isinstance(jop.rightRelation, InMemoryRelation):
+            cnames.append([c.name for c in  jop.rightRelation.inMemoryTable.columns])
+            cnames = utl.flatten(cnames)
+
+    cnames = list(set(cnames))
+    return cnames
+
+
 #FIXME Not comparing Gather and Join steps at the moment
 def compare_step(client, tableIdx, stp, refStp, referenceSchemaPath, tol=0, tolType="absolute", tableComp=[], verbose=False):
     stepResult = {}
     # NOTE Possibly unnecessary, but input data might change
-    if(isinstance(stp, TableStep)):
+    # if(isinstance(stp, TableStep)):
 
-        if isinstance(stp.model.relation, SimpleRelation):
-            sch = client.tableSchemaService.get(stp.model.relation.id)
-            inNames = [c.name for c in sch.columns]
-        elif isinstance(stp.model.relation, InMemoryRelation):
-            inNames = [c.name for c in stp.model.relation.inMemoryTable.columns]
-        else:    
-            sch = client.tableSchemaService.get(stp.model.relation.relation.id)
-            inNames = [c.name for c in sch.columns]
+    #     if isinstance(stp.model.relation, SimpleRelation):
+    #         sch = client.tableSchemaService.get(stp.model.relation.id)
+    #         inNames = [c.name for c in sch.columns]
+    #     elif isinstance(stp.model.relation, InMemoryRelation):
+    #         inNames = [c.name for c in stp.model.relation.inMemoryTable.columns]
+    #     elif isinstance(stp.model.relation, CompositeRelation): 
+    #         inNames = __get_colnames(stp.model.relation)
+    #     else:    
+    #         sch = client.tableSchemaService.get(stp.model.relation.relation.id)
+    #         inNames = [c.name for c in sch.columns]
 
 
         
-        if isinstance(refStp.model.relation, SimpleRelation):
-            #sch = client.tableSchemaService.get(refStp.model.relation.id)
+    #     if isinstance(refStp.model.relation, SimpleRelation):
+    #         #sch = client.tableSchemaService.get(refStp.model.relation.id)
             
-            tbl = pl.read_csv("{}/{}/data.csv".format(referenceSchemaPath, refStp.model.relation.id) )
-            refInNames = [c for c in tbl.columns]
+    #         tbl = pl.read_csv("{}/{}/data.csv".format(referenceSchemaPath, refStp.model.relation.id) )
+    #         refInNames = [c for c in tbl.columns]
 
-        elif isinstance(refStp.model.relation, InMemoryRelation):
-            #refInNames = [c.name for c in refStp.model.relation.inMemoryTable.columns]
-            # TODO Check if this ever occurs in an exported workflow
-            tbl = pl.read_csv("{}/{}/data.csv", referenceSchemaPath, refStp.model.relation.id)            
-            refInNames = [c for c in tbl.columns]
-        else:    
-            #sch = client.tableSchemaService.get(refStp.model.relation.relation.id)
-            #refInNames = [c.name for c in sch.columns]
-            tbl = pl.read_csv("{}/{}/data.csv".format(referenceSchemaPath, refStp.model.relation.relation.id) )
-            refInNames = [c for c in tbl.columns]
+    #     elif isinstance(refStp.model.relation, InMemoryRelation):
+    #         #refInNames = [c.name for c in refStp.model.relation.inMemoryTable.columns]
+    #         # TODO Check if this ever occurs in an exported workflow
+    #         tbl = pl.read_csv("{}/{}/data.csv", referenceSchemaPath, refStp.model.relation.id)            
+    #         refInNames = [c for c in tbl.columns]
+    #     else:    
+    #         #sch = client.tableSchemaService.get(refStp.model.relation.relation.id)
+    #         #refInNames = [c.name for c in sch.columns]
+    #         tbl = pl.read_csv("{}/{}/data.csv".format(referenceSchemaPath, refStp.model.relation.relation.id) )
+    #         refInNames = [c for c in tbl.columns]
 
         
 
 
-        res = compare_columns_metadata(inNames, refInNames)
+    #     res = compare_columns_metadata(inNames, refInNames)
 
 
-        if len(res) > 0:
-            res["Name"] = stp.name
-            stepResult = {**stepResult, **res}
-            # resultDict["Steps"] = [res]
+    #     if len(res) > 0:
+    #         res["Name"] = stp.name
+    #         stepResult = {**stepResult, **res}
+    #         # resultDict["Steps"] = [res]
 
 
     if(isinstance(stp, DataStep)):

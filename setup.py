@@ -11,7 +11,7 @@ setup(
     ],
     entry_points={
     "console_scripts": [
-      "template_test = __main__:exec"
+      "template_test = entry:exec"
     ]
     }
 )

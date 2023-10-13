@@ -44,22 +44,18 @@ def parse_args(argv):
                                 "tolerance=", "toleranceType=",
                                 "filename=", "filemap="])
     
-# workflowInfo = {"verbose":True, "toleranceType":"relative","tolerance":0.001,"operators":[], 
-                # "tableStepFiles":[{"stepId":"", "filename":""}]}
-
-    #python3 template_tester.py  --templateRepo=tercen/workflow_lib_repo --templateVersion=latest --templatePath=template_mean_crabs_2.zip  
-    # --gsRepo=tercen/workflow_lib_repo --gsVersion=latest --gsPath=golden_standard_mean_crabs_2.zip 
     
+#python3 template_tester.py  --templateRepo=tercen/scRNAseq_basic_template_test --templateVersion=latest --gsRepo=templateRepo=tercen/scRNAseq_basic_template_test --gsVersion=latest --gsPath=tests/example_test_gs.zip
     serviceUri = 'http://127.0.0.1'
     servicePort = '5400'
-    templateRepo = "tercen/scRNAseq_basic_template_test" #'tercen/workflow_lib_repo'
-    templateVersion = 'main'
+    templateRepo = None #"tercen/scRNAseq_basic_template_test" #'tercen/workflow_lib_repo'
+    templateVersion = 'latest'
     templatePath =  None #'template_mean_crabs_2.zip'
     
 
-    gsRepo = "tercen/scRNAseq_basic_template_test" #'tercen/workflow_lib_repo'
-    gsVersion = 'main'
-    gsPath = 'tests/example_test_gs.zip'
+    gsRepo = None #"tercen/scRNAseq_basic_template_test" #'tercen/workflow_lib_repo'
+    gsVersion = 'latest'
+    gsPath = None #'tests/example_test_gs.zip'
     
 
     user = 'test'
@@ -85,8 +81,6 @@ def parse_args(argv):
         
         if opt == '--templateVersion':
             templateVersion = arg
-            if templateVersion == "latest":
-                templateVersion = "main"
         
         if opt == '--templateRepo':
             templateRepo = arg
@@ -138,8 +132,12 @@ def parse_args(argv):
             filename = arg
         if opt == '--filemap':
             filemap = arg
+    
+    if templateVersion == "latest":
+        templateVersion = "main"
             
-            
+    if gsVersion == "latest":
+        gsVersion = "main"
 
     serviceUri = '{}:{}'.format(serviceUri, servicePort)
 
@@ -171,32 +169,10 @@ def parse_args(argv):
         with open(filemap) as f:
             params["filemap"] = json.load(f)
         
-    # # Methods in the client's base.py are missing the response parse
-    # # Se library calls like the one below are not working.
-    # # This must be changed in future version, both in the client and here
-    
-    # #
-    # # Also, this methods returns a TableSchema without id
-    # from tercen.http.HttpClientService import HttpClientService, URI, encodeTSON, decodeTSON, MultiPart, MultiPartMixTransformer, URI
-    # uri = URI.create("api/v1/d" + "/" + "getTercenDatasetLibrary")
-    # p = {}
-    # p["offset"] = 0
-    # p["limit"] = 100
-    # response = client.httpClient.post(
-    #     client.tercenURI.resolve(uri).toString(), None, encodeTSON(p))
-    # schemas = [TableSchema.createFromJson(sch) for sch in decodeTSON(response)]
-    # idx = which([sch.name == dataset for sch in schemas])
-    # schema = schemas[idx]
-    # #print(schema.id) # MISSING
-    # # #END OF hard code for the client
-
-
     return params
 
 
 if __name__ == '__main__':
-    #python3 template_tester.py  --templateRepo=tercen/workflow_lib_repo --templateVersion=latest --templatePath=template_mean_crabs_2.zip --gsRepo=tercen/workflow_lib_repo --gsVersion=latest --gsPath=golden_standard_mean_crabs_2.zip --projectId=2aa4e5e69e49703961f2af4c5e000dd1 --filename="Crabs DataB.csv"
-
     absPath = os.path.dirname(os.path.abspath(__file__))
     
     params = parse_args(sys.argv[1:])
@@ -205,7 +181,6 @@ if __name__ == '__main__':
 
     
     # Create temp project to run tests
-
     project = Project()
     project.name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
     project.name = 'template_test_' + project.name
@@ -219,12 +194,14 @@ if __name__ == '__main__':
     if params["templatePath"] == None:
         # Template repo, only latest version and main branch
         gitCmd = 'https://github.com/{}'.format(params["templateRepo"])
-        tmpDir = "data"
+        #tmpDir = "data"
+        tmpDir = "{}/AA_{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
         zipFilePath = "{}/{}".format(tmpDir, params["templateRepo"].split("/")[-1])
 
         if params["templateVersion"] == "main" or params["templateVersion"] == "latest":
             subprocess.call(['git','clone', gitCmd, zipFilePath])
         else:
+            # TODO Would get a specific branch
             pass
             exit(1)
             #subprocess.call(['git','clone', '--bare', gitCmd, zipFilePath])
@@ -238,22 +215,18 @@ if __name__ == '__main__':
     else:
         # Template or golden standard is a zip file
         gitCmd = 'https://github.com/{}/raw/{}/{}'.format(params["templateRepo"], params["templateVersion"],params["templatePath"])
-        # tmpDir = "{}/{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
-        tmpDir = "data"
+        tmpDir = "{}/AA_{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
+        #tmpDir = "data"
 
         zipFilePath = "{}/{}".format(tmpDir, params["templatePath"].split("/")[-1])
 
-        #os.mkdir(tmpDir)
+        os.mkdir(tmpDir)
 
         subprocess.call(['wget', '-O', zipFilePath, gitCmd])
         subprocess.run(["unzip", '-qq', '-d', tmpDir, '-o', zipFilePath])
 
         zip  = ZipFile(zipFilePath)
         currentZipFolder = zip.namelist()[0]
-
-
-
-
 
 
     with open( "{}/{}/workflow.json".format(tmpDir, currentZipFolder) ) as wf:
@@ -311,15 +284,17 @@ if __name__ == '__main__':
     # #https://github.com/tercen/workflow_runner/blob/a442105f74371285c49572148deb024436176ef8/workflow_files/reference_workflow.zip
     gitCmd = 'https://github.com/{}/raw/{}/{}'.format(params["gsRepo"], params["gsVersion"],params["gsPath"])
 
-    # # tmpDir = "{}/{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
-    tmpDir = "data"
+    tmpDir = "{}/AA_{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
+    #tmpDir = "data"
 
-    zipFilePath = "{}/{}".format(tmpDir, params["gsPath"].split("/")[-1])
-
-    # #os.mkdir(tmpDir)
+    
+    zipFilePath = "{}/{}".format(tmpDir, os.path.dirname(params["gsPath"]))
+    
+    os.mkdir(tmpDir)
     subprocess.call(['wget', '-O', zipFilePath, gitCmd])
     subprocess.run(["unzip", '-qq', '-d', tmpDir, '-o', zipFilePath])
 
+    
     zip  = ZipFile(zipFilePath)
     currentZipFolder = zip.namelist()[0]
 
@@ -348,6 +323,8 @@ if __name__ == '__main__':
                                 params["toleranceType"], verbose)
 
         resultList.append(resultDict)
+    except e:
+        print(e)
     finally:
         client.workflowService.delete(workflow.id, workflow.rev)
 
@@ -365,7 +342,7 @@ if __name__ == '__main__':
         else:
             os.unlink(f)
 
-    client.teamService.delete(project.id, project.rev)
+    #client.teamService.delete(project.id, project.rev)
     
 
 

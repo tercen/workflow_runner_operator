@@ -322,18 +322,39 @@ def compare_step(client, tableIdx, stp, refStp, referenceSchemaPath, tol=0, tolT
     return stepResult
 
 def diff_workflow(client, workflow, refWorkflow, referenceSchemaPath, tol=0, tolType="absolute", verbose=False):
-    resultDict = {}
+    resultDict = []
 
     if len(workflow.steps) != len(refWorkflow.steps):
-        resultDict["NumOfSteps"] = ["Number of steps between workflow and template are not equal: {} x {}".format(len(workflow.steps),  len(refWorkflow.steps))]
+        resultDict.append( {"NumOfSteps":"Number of steps between workflow and template are not equal: {} x {}".format(len(workflow.steps),  len(refWorkflow.steps))})
 
     for i in range(0, len(workflow.steps)):
         if i < len(workflow.steps) and i < len(refWorkflow.steps):
             stp = workflow.steps[i]
             refStp = refWorkflow.steps[i]
 
-            stepRes = compare_step(client, i, stp, refStp, referenceSchemaPath, tol, tolType, verbose)
-            resultDict = {**resultDict, **stepRes}
+            #TODO
+            # Compare if fully ran or failed step
+            # UPLOAD current gs and workflow
+            #if stp.state
+            if isinstance(stp.state.taskState, DoneState) and isinstance(refStp.state.taskState, DoneState):
+                stepRes = compare_step(client, i, stp, refStp, referenceSchemaPath, tol, tolType, verbose)
+                # resultDict = {**resultDict, **stepRes}
+                if len(stepRes) > 0:
+                    resultDict.append(stepRes)
+            else:
+                if isinstance(stp.state.taskState, FailedState):
+                    stepRes = {"Name":stp.name}
+                    stepRes["TaskState"] = "Step did not run successfully"
+                    # resultDict = {**resultDict, **stepRes}
+                    if len(stepRes) > 0:
+                        resultDict.append(stepRes)
+
+                if isinstance(stp.state.taskState, InitState):
+                    stepRes = {"Name":stp.name}
+                    stepRes["TaskState"] = "Step did not run, likely due to a failed preceding step."
+                    # resultDict = {**resultDict, **stepRes}
+                    if len(stepRes) > 0:
+                        resultDict.append(stepRes)
 
         
 

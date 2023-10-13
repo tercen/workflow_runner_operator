@@ -7,4 +7,9 @@ setup(
     install_requires=[
         'tercen_python_client @ git+https://github.com/tercen/tercen_python_client@0.7.16'
     ],
+    entry_points={
+    "console_scripts": [
+      "template_test = template_tester.main:main"
+    ]
+    }
 )

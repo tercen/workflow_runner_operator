@@ -45,6 +45,11 @@ def parse_args(argv):
     # python3 runner.py --templateRepo=tercen/workflow_runner --templateWkfPath=workflow_files/reference_workflow.zip --templateWkfVersion=a442105f74371285c49572148deb024436176ef8
     # wget -o /tmp/some_workflow.zip https://github.com/tercen/tercen_python_client/raw/0.7.11/setup.py
 
+    # python3 template_tester.py  --templateRepo=tercen/workflow_lib_repo --templateVersion=latest 
+    # --templatePath=template_mean_crabs_2.zip --gsRepo=tercen/workflow_lib_repo 
+    # --gsVersion=latest --gsPath=golden_standard_mean_crabs_2.zip 
+
+
     # If this is passed, use this to get the workflow
     workflowId = ''
     workflowVersion = ''
@@ -142,29 +147,8 @@ def parse_args(argv):
     params["projectId"] = projectId
     params["confFilePath"] = confFilePath
 
-    #FIXME 
-    # Methods in the client's base.py are missing the response parse
-    # Se library calls like the one below are not working.
-    # This must be changed in future version, both in the client and here
-    # print(client.documentService.getTercenDatasetLibrary(0,100) )
-    #
-    # Also, this methods returns a TableSchema without id
-    from tercen.http.HttpClientService import HttpClientService, URI, encodeTSON, decodeTSON, MultiPart, MultiPartMixTransformer, URI
-    uri = URI.create("api/v1/d" + "/" + "getTercenDatasetLibrary")
-    p = {}
-    p["offset"] = 0
-    p["limit"] = 100
-    response = client.httpClient.post(
-        client.tercenURI.resolve(uri).toString(), None, encodeTSON(p))
     
-    schemas = [TableSchema.createFromJson(sch) for sch in decodeTSON(response)]
-    idx = which([sch.name == dataset for sch in schemas])
-    
-    schema = schemas[idx]
-    #print(schema.id) # MISSING
-    # #END OF hard code for the client
-    
-    #FIXME HArdcoded
+    #FIXME Hardcoded user
     
 
     #print(client.projectDocumentService.findSchemaByOwnerAndLastModifiedDate("test", ""))
@@ -173,13 +157,6 @@ def parse_args(argv):
     doc = docs[idx[0]]
     params["datasetId"] = doc.id
 
-    #fileList = client.projectDocumentService.findFileByLastModifiedDate("99999","") 
-    #[print(f.name) for f in fileList]
-    # Remove tmp files and zip file
-    #fileList = glob.glob("{}/*".format(tmpDir), recursive=False)
-    #for f in fileList:
-    #    if os.path.isdir(f):
-    #        shutil.rmtree(f)
 
     return params
 

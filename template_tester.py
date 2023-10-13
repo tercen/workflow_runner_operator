@@ -67,6 +67,8 @@ def parse_args(argv):
     toleranceType="relative"
 
     # TODO Add the file mapping parse for multiple table steps situation
+    # TODO Get the mapping from github...
+    # TODO Add possibility to have GS, Template and File all from the same repo (avoid multiple downloads)
     filename="file:/workspaces/workflow_runner/in_data/cellranger_example_data.zip" #None #"Crabs Data.csv"
     filemap=None 
 

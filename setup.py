@@ -1,5 +1,7 @@
 from setuptools import setup, find_packages
 
+
+
 setup(
     name='template_runner',
     version='0.0.1',
@@ -9,7 +11,8 @@ setup(
     ],
     entry_points={
     "console_scripts": [
-      "template_test = template_tester:main"
+      "template_test = workflow_runner.__main__:main"
     ]
     }
 )
+

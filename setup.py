@@ -11,7 +11,7 @@ setup(
     ],
     entry_points={
     "console_scripts": [
-      "template_test = workflow_runner.entry:exec"
+      "template_test = cmd.entry:main"
     ]
     }
 )

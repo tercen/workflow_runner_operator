@@ -1,17 +1,18 @@
-from setuptools import setup, find_packages
+from setuptools import setup #, find_packages
 
 
 
 setup(
     name='workflow_runner',
     version='0.0.1',
-    packages=find_packages(exclude=['workflow_files']),
+    #packages=find_packages(exclude=['workflow_files']),
+    packages=["template_tester", "entry"],
     install_requires=[
         'tercen_python_client @ git+https://github.com/tercen/tercen_python_client@0.7.16'
     ],
     entry_points={
     "console_scripts": [
-      "template_test = cmd.entry:main"
+      "template_test = entry:exec"
     ]
     }
 )

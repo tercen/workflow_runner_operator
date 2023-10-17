@@ -64,11 +64,9 @@ def parse_args(argv):
     tolerance = 0.001
     toleranceType="relative"
 
-    # TODO Add the file mapping parse for multiple table steps situation
-    # TODO Get the mapping from github...
-    # TODO Add possibility to have GS, Template and File all from the same repo (avoid multiple downloads)
+
     #filename="file:/workspaces/workflow_runner/in_data/cellranger_example_data.zip" #None #"Crabs Data.csv"
-    filename=None "repo:tercen/scRNAseq_basic_template_test@/tests/cellranger_example_data.zip" #None #"Crabs Data.csv"
+    filename=None #"repo:tercen/scRNAseq_basic_template_test@/tests/cellranger_example_data.zip" #None #"Crabs Data.csv"
     filemap=None 
 
     

@@ -52,7 +52,10 @@ def get_installed_operator(client, installedOperators, opName, opUrl, opVersion,
         idx = which(comp)
         if isinstance(idx, list):
             idx = idx[0]
+
         operator = installedOperators[idx]
+
+        print("Adding {}".format(operator.name))
 
 
     return operator
@@ -489,14 +492,15 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
                     rel = CompositeRelation()
                     nTables = len(filemap["filename"])
 
-                    # "Main" Table --> Table 1
-                    jop = utl.as_join_operator(filemap["filename"][0], [], [])
-                    rel.joinOperators = [jop]
-
-                    #FIXME
-                    # Currently, only 3 tables handles
-                    # If this code remains, then this should be adjusted
                     if nTables > 1:
+                        # "Main" Table --> Table 1
+                        jop = utl.as_join_operator(filemap["filename"][0], [], [])
+                        rel.joinOperators = [jop]
+
+                        #FIXME
+                        # Currently, only 3 tables handles
+                        # If this code remains, then this should be adjusted
+                    
                         # Col & Row Tables
                         rel.mainRelation = utl.as_composite_relation(filemap["filename"][0])
                         
@@ -510,7 +514,7 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
 
                         rel.mainRelation.joinOperators = jops
                     else:
-                        rel.mainRelation = utl.as_relation(filemap["filename"][0])
+                        rel.mainRelation = utl.as_relation(filemap["filename"])
         
                     #wkf = client.workflowService.get(workflow.id)
                     workflow.steps[i].model.relation = rel # ur

@@ -7,6 +7,8 @@ from zipfile import ZipFile
 
 import tempfile, string, random
 
+sys.path.append("../")
+
 from workflow_runner.util import msg, which
 from workflow_runner.workflow_setup_client import create_test_workflow, update_table_relations
 from workflow_runner.workflow_compare_client import diff_workflow
@@ -43,8 +45,8 @@ def parse_args(argv):
     
     
 #python3 template_tester.py  --templateRepo=tercen/scRNAseq_basic_template_test --gsRepo=templateRepo=tercen/scRNAseq_basic_template_test --gsPath=tests/example_test_gs.zip
-    serviceUri = 'http://127.0.0.1'
-    servicePort = '5400'
+    serviceUri = 'http://127.0.0.1:5400'
+
     templateRepo = None #"tercen/scRNAseq_basic_template_test" #'tercen/workflow_lib_repo'
     templateVersion = 'latest'
     templatePath =  None 

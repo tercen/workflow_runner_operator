@@ -26,9 +26,9 @@ import polars as pl
 
 
 
-def get_installed_operator(client, installedOperators, opUrl, opVersion, verbose=False):
-    opTag = '{}@{}'.format(opUrl, opVersion)
-    comp = [opTag ==  '{}@{}'.format(iop.url.uri, iop.version) for iop in installedOperators]
+def get_installed_operator(client, installedOperators, opName, opUrl, opVersion, verbose=False):
+    opTag = '{}@{}@{}'.format(opName, opUrl, opVersion)
+    comp = [opTag ==  '{}@{}@{}'.format(iop.name, iop.url.uri, iop.version) for iop in installedOperators]
 
 
     if not np.any(comp):
@@ -49,7 +49,10 @@ def get_installed_operator(client, installedOperators, opUrl, opVersion, verbose
 
         operator = client.operatorService.get(installTask.operatorId)
     else:
-        operator = installedOperators[which(comp)[0]]
+        idx = which(comp)
+        if isinstance(idx, list):
+            idx = idx[0]
+        operator = installedOperators[idx]
 
 
     return operator
@@ -71,6 +74,7 @@ def update_operators(workflow, refWorkflow, operatorList, client, verbose=False)
         
 
         if stp.__class__ == DataStep:
+            opName = stp.model.operatorSettings.operatorRef.name
             opUrl = stp.model.operatorSettings.operatorRef.url.uri
             opVersion = stp.model.operatorSettings.operatorRef.version
 
@@ -79,7 +83,7 @@ def update_operators(workflow, refWorkflow, operatorList, client, verbose=False)
 
             # FIXME DEBUG from here
             if opUrl != '':
-                operator = get_installed_operator(client, installedOperators, opUrl, opVersion)
+                operator = get_installed_operator(client, installedOperators, opName, opUrl, opVersion)
 
 
 
@@ -355,7 +359,12 @@ def __upload_file_as_table(client, filename, projectId, user, cellranger=True):
             rcTask = client.taskService.waitDone(rcTask.id)
 
             #TODO Clean up
-            tableSchemas = __get_table_schemas(rcTask.computedRelation.joinOperators[0], client)
+            if isinstance(rcTask.computedRelation, CompositeRelation):
+                tableSchemas = __get_table_schemas(rcTask.computedRelation.joinOperators[0], client)
+                
+            else:
+                tableSchemas = __get_table_schemas(rcTask.computedRelation, client)
+            
             tableSchemas = utl.flatten(tableSchemas)
             for ts in tableSchemas:
                 for col in ts.columns:

@@ -8,11 +8,7 @@ import copy, string, random, tempfile, subprocess
 
 from datetime import datetime
 
-sys.path.append('./')
-sys.path.append('../../')
-
-
-from util import msg, which
+from workflow_runner.util import msg, which
 
 
 from tercen.model.base import *

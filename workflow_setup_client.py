@@ -55,7 +55,7 @@ def get_installed_operator(client, installedOperators, opName, opUrl, opVersion,
 
         operator = installedOperators[idx]
 
-        print("Adding {}".format(operator.name))
+        print("Adding {}:{}".format(operator.name, operator.version))
 
 
     return operator
@@ -102,27 +102,8 @@ def update_operators(workflow, refWorkflow, operatorList, client, verbose=False)
         #opTag = '{}@{}'.format(op["operatorURL"], op["version"])
         #comp = [opTag ==  '{}@{}'.format(iop.url.uri, iop.version) for iop in installedOperators]
 
-        operator = get_installed_operator(client, installedOperators, op["operatorURL"], op["version"])
+        operator = get_installed_operator(client, installedOperators, op["name"], op["operatorURL"], op["version"])
 
-        # if not np.any(comp):
-        #     # install the operator
-        #     msg("Installing {}".format(opTag), verbose)
-        #     installTask = CreateGitOperatorTask()
-        #     installTask.state = InitState()
-        #     installTask.url.uri = op["operatorURL"]
-        #     installTask.version = op["version"]
-            
-        #     installTask.testRequired = False
-        #     installTask.isDeleted = False
-        #     installTask.owner = 'test'
-
-        #     installTask = client.taskService.create(installTask)
-        #     client.taskService.runTask(installTask.id)
-        #     installTask = client.taskService.waitDone(installTask.id)
-
-        #     operator = client.operatorService.get(installTask.operatorId)
-        # else:
-        #     operator = installedOperators[which(comp)]
 
         stpIdx = which([op["stepId"] == stp.id for stp in refWorkflow.steps])
         workflow.steps[stpIdx].model.operatorSettings.operatorRef.operatorId = operator.id
@@ -291,14 +272,16 @@ def __get_file_id(client, user, tbf, projectId):
 
 
 
-def __upload_file_as_table(client, filename, projectId, user, cellranger=True):
+def __upload_file_as_table(client, filename, projectId, user, cellranger=False):
         
         #FIXME Will likely be removed later
         if cellranger == True:
             opList =client.documentService.getTercenOperatorLibrary(0,1)
+            installedOps = client.documentService.findOperatorByOwnerLastModifiedDate(user,"")
 
             crOpIdx = which(  [op.name == "Cell Ranger" for op in opList]  )
             cellrangerOp = opList[crOpIdx]
+            cellrangerOp = get_installed_operator(client, installedOps, cellrangerOp.name, cellrangerOp.url.uri, cellrangerOp.version)
 
             with open(filename, 'rb') as file_data:
                 bytesData = file_data.read()
@@ -429,7 +412,7 @@ def __get_table_schemas(joinOp, client):
     return tableSchemas
 
 # Separate function for legibility
-def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose=False):
+def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose=False, cellranger=False):
     msg("Setting up table step references in new workflow.", verbose)
     if refWorkflow == None:
         refWorkflow = client.workflowService.get(workflowInfo["workflowId"])
@@ -474,7 +457,7 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
         if filemap.startswith("file:"):
             #local file
             filemap = filemap.split("file:")[-1]
-            res = __upload_file_as_table(client, filemap, workflow.projectId, user)
+            res = __upload_file_as_table(client, filemap, workflow.projectId, user, cellranger)
             filemap = res
 
         filemap = {"filename":filemap}

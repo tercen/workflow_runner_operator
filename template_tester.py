@@ -38,7 +38,7 @@ def parse_args(argv):
                                ["templateInfo=", 
                                 "templateVersion=", "templateRepo=", "templatePath=",
                                 "gsVersion=", "gsRepo=", "gsPath=",
-                                "serviceUri=", "gitToken=",
+                                "serviceUri=", "gitToken=", "cellranger",
                                 "user=", "passw=", "authToken=", "verbose",
                                 "tolerance=", "toleranceType=",
                                 "filename=", "filemap="])
@@ -71,7 +71,7 @@ def parse_args(argv):
     filename=None #"repo:tercen/scRNAseq_basic_template_test@/tests/cellranger_example_data.zip" #None #"Crabs Data.csv"
     filemap=None 
 
-    
+    cellranger = True
     for opt, arg in opts:
         if opt == '-h':
             print('runner.py ARGS')
@@ -82,6 +82,9 @@ def parse_args(argv):
         
         if opt == '--templateVersion':
             templateVersion = arg
+
+        if opt == '--cellranger':
+            cellranger = True
         
         if opt == '--templateRepo':
             templateRepo = arg
@@ -167,6 +170,7 @@ def parse_args(argv):
     params["gsPath"] = gsPath
     
     params["filename"] = filename
+    params["cellranger"] = cellranger
         
     if filemap != None and os.path.exists(filemap):
         with open(filemap) as f:
@@ -265,7 +269,7 @@ def run(argv):
         
 
     try:
-        update_table_relations(client, refWorkflow, workflow, filemap, params["user"], verbose=verbose)
+        update_table_relations(client, refWorkflow, workflow, filemap, params["user"], verbose=verbose, cellranger=params["cellranger"])
         
     except FileNotFoundError as e:
         print(e)
@@ -437,7 +441,7 @@ if __name__ == '__main__':
         
 
     try:
-        update_table_relations(client, refWorkflow, workflow, filemap, params["user"], verbose=verbose)
+        update_table_relations(client, refWorkflow, workflow, filemap, params["user"], verbose=verbose, cellranger=params["cellranger"])
         
     except FileNotFoundError as e:
         print(e)

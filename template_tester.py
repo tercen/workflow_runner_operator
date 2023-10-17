@@ -9,7 +9,7 @@ import tempfile, string, random
 
 sys.path.append("../")
 
-from workflow_runner.util import msg, which
+from workflow_runner.util import msg, which, flatten
 from workflow_runner.workflow_setup_client import create_test_workflow, update_table_relations
 from workflow_runner.workflow_compare_client import diff_workflow
 
@@ -513,7 +513,7 @@ if __name__ == '__main__':
 
 
     
-    print(resultList)
+    #print(resultList)
 
     # Remove tmp files and zip file
     fileList = glob.glob("{}/*".format(tmpDir), recursive=False)
@@ -522,6 +522,14 @@ if __name__ == '__main__':
             shutil.rmtree(f)
         else:
             os.unlink(f)
+
+
+    resultList = flatten(resultList)
+
+    if len(resultList) > 0:
+        raise Exception(resultList)
+    else:
+        print("Template ran successfully")
 
     #client.teamService.delete(project.id, project.rev)
     

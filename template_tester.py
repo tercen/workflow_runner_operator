@@ -527,7 +527,8 @@ if __name__ == '__main__':
     resultList = flatten(resultList)
 
     if len(resultList) > 0:
-        raise Exception(resultList)
+        #TODO make a print string
+        raise Exception(json.dumps(resultList, sort_keys=True, indent=4))
     else:
         print("Template ran successfully")
 

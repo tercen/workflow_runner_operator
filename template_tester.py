@@ -36,7 +36,7 @@ def parse_args(argv):
                                ["templateInfo=", 
                                 "templateVersion=", "templateRepo=", "templatePath=",
                                 "gsVersion=", "gsRepo=", "gsPath=",
-                                "serviceUri=", 
+                                "serviceUri=", "gitToken=",
                                 "user=", "passw=", "authToken=", "verbose",
                                 "tolerance=", "toleranceType=",
                                 "filename=", "filemap="])
@@ -58,6 +58,7 @@ def parse_args(argv):
     user = 'test'
     passw = 'test'
     authToken = ''
+    gitToken = None
     verbose = False
     
     tolerance = 0.001
@@ -67,7 +68,7 @@ def parse_args(argv):
     # TODO Get the mapping from github...
     # TODO Add possibility to have GS, Template and File all from the same repo (avoid multiple downloads)
     #filename="file:/workspaces/workflow_runner/in_data/cellranger_example_data.zip" #None #"Crabs Data.csv"
-    filename="repo:tercen/scRNAseq_basic_template_test@/tests/cellranger_example_data.zip" #None #"Crabs Data.csv"
+    filename=None "repo:tercen/scRNAseq_basic_template_test@/tests/cellranger_example_data.zip" #None #"Crabs Data.csv"
     filemap=None 
 
     
@@ -97,6 +98,8 @@ def parse_args(argv):
         if opt == '--gsRepo':
             gsRepo = arg
 
+        if opt == '--gitToken':
+            gitToken = arg
 
         if opt == '--gsPath':
             gsPath = arg
@@ -139,7 +142,7 @@ def parse_args(argv):
     if gsVersion == "latest":
         gsVersion = "main"
 
-    serviceUri = '{}:{}'.format(serviceUri, servicePort)
+    #serviceUri = '{}:{}'.format(serviceUri, servicePort)
 
     client = TercenClient(serviceUri)
     client.userService.connect(user, passw)
@@ -164,11 +167,13 @@ def parse_args(argv):
     params["gsPath"] = gsPath
     
     params["filename"] = filename
-    
+        
     if filemap != None and os.path.exists(filemap):
         with open(filemap) as f:
             params["filemap"] = json.load(f)
-        
+
+    params["gitToken"] = gitToken
+
     return params
 
 

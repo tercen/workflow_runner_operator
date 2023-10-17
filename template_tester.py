@@ -9,9 +9,11 @@ import tempfile, string, random
 
 sys.path.append("../")
 
-from workflow_runner.util import msg, which, flatten
+from workflow_runner.util import msg, which
 from workflow_runner.workflow_setup_client import create_test_workflow, update_table_relations
 from workflow_runner.workflow_compare_client import diff_workflow
+
+import tercen.util.helper_functions as utl
 
 
 from tercen.client.factory import TercenClient
@@ -524,7 +526,7 @@ if __name__ == '__main__':
             os.unlink(f)
 
 
-    resultList = flatten(resultList)
+    resultList = utl.flatten(resultList)
 
     if len(resultList) > 0:
         #TODO make a print string

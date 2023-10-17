@@ -10,7 +10,7 @@ import tempfile, string, random
 from workflow_runner.util import msg, which
 from workflow_runner.workflow_setup_client import create_test_workflow, update_table_relations
 from workflow_runner.workflow_compare_client import diff_workflow
-from workflow_runner.workflow_stats import stats_workflow
+
 
 from tercen.client.factory import TercenClient
 

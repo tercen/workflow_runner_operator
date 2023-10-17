@@ -49,7 +49,7 @@ def get_installed_operator(client, installedOperators, opUrl, opVersion, verbose
 
         operator = client.operatorService.get(installTask.operatorId)
     else:
-        operator = installedOperators[which(comp)]
+        operator = installedOperators[which(comp)[0]]
 
 
     return operator

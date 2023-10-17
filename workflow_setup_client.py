@@ -2,7 +2,7 @@ import os , io
 import sys
 import json
 
-import copy
+import copy, string, random, tempfile, subprocess
 
 
 
@@ -441,11 +441,33 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
 
     elif isinstance(filemap, str):
 
+        if filemap.startswith("repo:"):
+            # Download as local file first
+            filemap = filemap.split("repo:")[-1]
+            urlParts = filemap.split("@")
+
+            
+            gitCmd = 'https://github.com/{}/raw/main/{}'.format(urlParts[0], urlParts[1])
+            tmpDir = "{}/AA_{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
+
+            os.makedirs(tmpDir)
+
+            zipFileName = "{}/{}".format(tmpDir, urlParts[1].split("/")[-1])
+            subprocess.call(['wget', '-O', zipFileName, gitCmd])
+
+
+
+            #subprocess.call(["unzip", '-qq', '-d', tmpDir, '-o', zipFileName])
+
+            #res = __upload_file_as_table(client, filemap, workflow.projectId, user)
+            #TODO CHECK FILENAME
+            filemap = "file:{}".format(zipFileName)
+
         if filemap.startswith("file:"):
             #local file
             filemap = filemap.split("file:")[-1]
             res = __upload_file_as_table(client, filemap, workflow.projectId, user)
-            filemap = res#.computedRelation
+            filemap = res
 
         filemap = {"filename":filemap}
         for i in range(0, len(workflow.steps)):

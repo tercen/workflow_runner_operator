@@ -45,12 +45,12 @@ def parse_args(argv):
                                 "filename=", "filemap="])
     
     
-#python3 template_tester.py  --templateRepo=tercen/scRNAseq_basic_template_test --templateVersion=latest --gsRepo=templateRepo=tercen/scRNAseq_basic_template_test --gsVersion=latest --gsPath=tests/example_test_gs.zip
+#python3 template_tester.py  --templateRepo=tercen/scRNAseq_basic_template_test --gsRepo=templateRepo=tercen/scRNAseq_basic_template_test --gsPath=tests/example_test_gs.zip
     serviceUri = 'http://127.0.0.1'
     servicePort = '5400'
     templateRepo = None #"tercen/scRNAseq_basic_template_test" #'tercen/workflow_lib_repo'
     templateVersion = 'latest'
-    templatePath =  None #'template_mean_crabs_2.zip'
+    templatePath =  None 
     
 
     gsRepo = None #"tercen/scRNAseq_basic_template_test" #'tercen/workflow_lib_repo'
@@ -69,7 +69,8 @@ def parse_args(argv):
     # TODO Add the file mapping parse for multiple table steps situation
     # TODO Get the mapping from github...
     # TODO Add possibility to have GS, Template and File all from the same repo (avoid multiple downloads)
-    filename="file:/workspaces/workflow_runner/in_data/cellranger_example_data.zip" #None #"Crabs Data.csv"
+    #filename="file:/workspaces/workflow_runner/in_data/cellranger_example_data.zip" #None #"Crabs Data.csv"
+    filename="repo:tercen/scRNAseq_basic_template_test@/tests/cellranger_example_data.zip" #None #"Crabs Data.csv"
     filemap=None 
 
     

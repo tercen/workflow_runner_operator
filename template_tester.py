@@ -532,7 +532,10 @@ if __name__ == '__main__':
     resultList = utl.flatten(resultList)
 
     if len(resultList) > 0:
-        raise Exception(json.dumps(resultList, sort_keys=True, indent=4))
+        errString = ""
+        for res in resultList:
+            errString = errString + json.dumps(res, sort_keys=True, indent=4) + "\n"
+        raise Exception(errString)
     else:
         print("Template ran successfully")
 

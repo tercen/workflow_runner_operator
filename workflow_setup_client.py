@@ -204,7 +204,7 @@ def __file_relation(client, fileId):
     return rr
 
 
-def __get_file_id(client, user, tbf, projectId):
+def __get_file_id(client, user, tbf, projectId, gitToken):
 
     if "fileId" in tbf:
         return tbf["fileId"]
@@ -221,7 +221,7 @@ def __get_file_id(client, user, tbf, projectId):
         if not fileDoc == None:
             gitTask = ImportGitDatasetTask()
             gitTask.state = InitState()
-            gitTask.gitToken = os.environ["GITHUB_TOKEN"]
+            gitTask.gitToken = gitToken #os.environ["GITHUB_TOKEN"]
             gitTask.projectId = projectId
             gitTask.url = fileDoc.url
             gitTask.version = fileDoc.version
@@ -257,7 +257,7 @@ def __get_file_id(client, user, tbf, projectId):
                     file.projectId = projectId
                     # bytes_data = encodeTSON(doc.toJson()).getvalue()
                     file = client.fileService.uploadTable(file, doc.toJson())
-                    client.d
+
 
                     pass
             idx = which(docComp)
@@ -412,7 +412,7 @@ def __get_table_schemas(joinOp, client):
     return tableSchemas
 
 # Separate function for legibility
-def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose=False, cellranger=False):
+def update_table_relations(client, refWorkflow, workflow, filemap, user, gitToken, verbose=False, cellranger=False):
     msg("Setting up table step references in new workflow.", verbose)
     if refWorkflow == None:
         refWorkflow = client.workflowService.get(workflowInfo["workflowId"])
@@ -425,7 +425,7 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
             if isinstance(refWorkflow.steps[i], TableStep):
                 stp = refWorkflow.steps[i]
                 filename = {"filename":stp.name} # This is not necessarily so
-                fileId = __get_file_id(client, user, filename, workflow.projectId)
+                fileId = __get_file_id(client, user, filename, workflow.projectId, gitToken)
                 rr = __file_relation(client, fileId)
                 workflow.steps[i].model.relation = rr
                 workflow.steps[i].state.taskState = DoneState()
@@ -466,7 +466,7 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
             if isinstance(workflow.steps[i], TableStep):
                 #print( tableStepFiles[0])
                 if isinstance(filemap["filename"], str):
-                    fileId = __get_file_id(client, user, filemap, workflow.projectId)
+                    fileId = __get_file_id(client, user, filemap, workflow.projectId, gitToken)
                     rr = __file_relation(client, fileId)
                     workflow.steps[i].model.relation = rr
                     workflow.steps[i].state.taskState = DoneState()
@@ -509,7 +509,7 @@ def update_table_relations(client, refWorkflow, workflow, filemap, user, verbose
             if not (isinstance(tblStepIdx, int) or len(tblStepIdx) > 0):
                 continue
 
-            fileId = __get_file_id(client, user, tbf)
+            fileId = __get_file_id(client, user, tbf, workflow.projectId, gitToken)
             rr = __file_relation(client, fileId)
            
 

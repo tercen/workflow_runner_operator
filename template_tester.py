@@ -178,6 +178,9 @@ def parse_args(argv):
         with open(filemap) as f:
             params["filemap"] = json.load(f)
 
+    if gitToken == None and "GITHUB_TOKEN" in os.environ:
+        gitToken = os.environ["GITHUB_TOKEN"]
+
     params["gitToken"] = gitToken
 
     return params
@@ -271,7 +274,7 @@ def run(argv):
         
 
     try:
-        update_table_relations(client, refWorkflow, workflow, filemap, params["user"], verbose=verbose, cellranger=params["cellranger"])
+        update_table_relations(client, refWorkflow, workflow, filemap, params["user"], params["gitToken"], verbose=verbose, cellranger=params["cellranger"])
         
     except FileNotFoundError as e:
         print(e)
@@ -529,7 +532,6 @@ if __name__ == '__main__':
     resultList = utl.flatten(resultList)
 
     if len(resultList) > 0:
-        #TODO make a print string
         raise Exception(json.dumps(resultList, sort_keys=True, indent=4))
     else:
         print("Template ran successfully")

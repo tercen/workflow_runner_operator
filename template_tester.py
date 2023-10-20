@@ -446,7 +446,7 @@ if __name__ == '__main__':
         
 
     try:
-        update_table_relations(client, refWorkflow, workflow, filemap, params["user"], verbose=verbose, cellranger=params["cellranger"])
+        update_table_relations(client, refWorkflow, workflow, filemap, params["user"], params["gitToken"], verbose=verbose, cellranger=params["cellranger"])
         
     except FileNotFoundError as e:
         print(e)

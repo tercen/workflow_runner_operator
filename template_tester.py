@@ -2,7 +2,7 @@ import os
 import sys, getopt, glob, shutil, subprocess
 import json
 import polars as pl
-
+import numpy as np
 from zipfile import ZipFile
 
 import tempfile, string, random
@@ -20,6 +20,33 @@ from tercen.client.factory import TercenClient
 
 from tercen.model.base import RunWorkflowTask, InitState,  Workflow, Project
 
+def numpy_to_list(obj):
+    if isinstance(obj, np.ndarray):
+        obj = obj.tolist()
+
+        for i in range(0, len(obj)):
+            obj[i] = numpy_to_list(obj[i])
+
+        return obj
+    elif isinstance(obj, list):
+        for i in range(0, len(obj)):
+            obj[i] = numpy_to_list(obj[i])
+
+        return obj
+    elif isinstance(obj, dict):
+        for key in obj:
+            obj[key] = numpy_to_list(obj[key])
+        
+        return obj
+    elif isinstance(obj, pl.Series):
+        obj = obj.to_list()
+
+        for i in range(0, len(obj)):
+            obj[i] = numpy_to_list(obj[i])
+
+        return obj
+    else:
+        return obj
 
 def run_workflow(workflow, project, client):
     # RUN the CLONED workflow 
@@ -49,14 +76,14 @@ def parse_args(argv):
 #python3 template_tester.py  --templateRepo=tercen/scRNAseq_basic_template_test --gsRepo=templateRepo=tercen/scRNAseq_basic_template_test --gsPath=tests/example_test_gs.zip
     serviceUri = 'http://127.0.0.1:5400'
 
-    templateRepo = None #"tercen/scRNAseq_basic_template_test" #'tercen/workflow_lib_repo'
+    templateRepo = "tercen/simple_workflow_template_test" #"tercen/scRNAseq_basic_template_test" #'tercen/workflow_lib_repo'
     templateVersion = 'latest'
     templatePath =  None 
     
 
-    gsRepo = None #"tercen/scRNAseq_basic_template_test" #'tercen/workflow_lib_repo'
+    gsRepo = "tercen/simple_workflow_template_test" #'tercen/workflow_lib_repo'
     gsVersion = 'latest'
-    gsPath = None #'tests/example_test_gs.zip'
+    gsPath = 'tests/Simple_gs.zip'
     
 
     user = 'test'
@@ -70,7 +97,7 @@ def parse_args(argv):
 
 
     #filename="file:/workspaces/workflow_runner/in_data/cellranger_example_data.zip" #None #"Crabs Data.csv"
-    filename=None #"repo:tercen/scRNAseq_basic_template_test@/tests/cellranger_example_data.zip" #None #"Crabs Data.csv"
+    filename="Crabs Data.csv" #None #"repo:tercen/scRNAseq_basic_template_test@/tests/cellranger_example_data.zip" #None #"Crabs Data.csv"
     filemap=None 
 
     cellranger = True
@@ -531,10 +558,14 @@ if __name__ == '__main__':
 
     resultList = utl.flatten(resultList)
 
+
+
+    
     if len(resultList) > 0:
         errString = ""
+        res = resultList[0]
         for res in resultList:
-            errString = errString + json.dumps(res, sort_keys=True, indent=4) + "\n"
+            errString = errString + json.dumps(numpy_to_list(res), sort_keys=True, indent=4) + "\n"
         raise Exception(errString)
     else:
         print("Template ran successfully")

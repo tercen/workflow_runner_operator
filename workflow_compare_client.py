@@ -82,17 +82,17 @@ def compare_table(client, tableIdx, jop, refJop, tol=0, tolType="Absolute"):
 
     if isinstance(refJop.rightRelation, SimpleRelation):
         # refTbl = pl.read_csv("{}/{}/data.csv".format( referenceSchemaPath, refJop.rightRelation.id))
-        refTbl = client.tableSchemaService.get(
+        refSchema = client.tableSchemaService.get(
             refJop.rightRelation.id
         )
     else:
-        # refTbl = pl.read_csv("{}/{}/data.csv".format( referenceSchemaPath, refJop.rightRelation.relation.mainRelation.id))
-        refTbl = client.tableSchemaService.get(
+        # refSchema = pl.read_csv("{}/{}/data.csv".format( referenceSchemaPath, refJop.rightRelation.relation.mainRelation.id))
+        refSchema = client.tableSchemaService.get(
             refJop.rightRelation.relation.mainRelation.id
         )
 
     # Compare schemas
-    refColNames = [c for c in refTbl.columns]
+    refColNames = [c.name for c in refSchema.columns]
     colNames = [c.name for c in schema.columns]
     res = compare_columns_metadata(colNames, refColNames)
 
@@ -100,12 +100,12 @@ def compare_table(client, tableIdx, jop, refJop, tol=0, tolType="Absolute"):
         tableRes = {**tableRes, **res}
         hasDiff = True
 
-    if schema.nRows != refTbl.shape[0]:
+    if schema.nRows != refSchema.nRows:
         hasDiff = True
         #TODO Try to get table name here... 
         tableRes["NumRows"] = "Number rows tables do not match for Table {:d} : {:d} x {:d} (Reference vs Workflow)".format(
             tableIdx+1, #k + 1,
-            refTbl.shape[0],
+            refSchema.nRows,
             schema.nRows 
         )
     else:
@@ -114,17 +114,19 @@ def compare_table(client, tableIdx, jop, refJop, tol=0, tolType="Absolute"):
         
         
         for ci in range(0, len(colNames)):
-            msg("Comparing {} against {}".format(colNames[ci], colNames[ci]))
+            msg("Comparing {} against {}".format(colNames[ci], refColNames[ci]))
             col = th.decodeTSON(client.tableSchemaService.selectStream(schema.id, [colNames[ci]], 0, -1))
+            refCol = th.decodeTSON(client.tableSchemaService.selectStream(refSchema.id, [refColNames[ci]], 0, -1))
             colVals = col["columns"][0]["values"]
+            refColVals = refCol["columns"][0]["values"]
             #refCol = th.decodeTSON(ctx.context.client.tableSchemaService.selectStream(refSchema.id, [refColNames[ci]], 0, -1))
             #refColVals = refCol["columns"][0]["values"]
-            refColVals = refTbl[:,ci]
-            refColType = polarDtype_to_numpyDtype(refTbl.dtypes[ci])
+            # refColVals = refSchema[:,ci]
+            # refColType = polarDtype_to_numpyDtype(refSchema.dtypes[ci])
 
 
             
-            if type(colVals[0]) != refColType:
+            if type(colVals[0]) != type(refColVals[0]):
                 hasDiff = True
                 k = 0 # FIXME Receive the table index for reporting here
                 print(hasattr(tableRes, "ColType"))

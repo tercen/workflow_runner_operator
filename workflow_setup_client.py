@@ -30,7 +30,7 @@ def get_installed_operator(client, installedOperators, opName, opUrl, opVersion,
 
     if not np.any(comp):
         # install the operator
-        msg("Installing {}".format(opTag), verbose)
+        msg("Installing {}:{} from {}".format(opName, opVersion, opUrl), verbose)
         installTask = CreateGitOperatorTask()
         installTask.state = InitState()
         installTask.url.uri = opUrl
@@ -52,25 +52,26 @@ def get_installed_operator(client, installedOperators, opName, opUrl, opVersion,
 
         operator = installedOperators[idx]
 
-        print("Adding {}:{}".format(operator.name, operator.version))
+        # print("Adding {}:{}".format(operator.name, operator.version))
 
 
     return operator
     
-
+def __is_operator_installed(opName, opUrl, opVersion, installedOperators):
+    opTag = '{}@{}@{}'.format(opName, opUrl, opVersion)
+    comp = [opTag ==  '{}@{}@{}'.format(iop.name, iop.url.uri, iop.version) for iop in installedOperators]
 
 def update_operators(workflow, refWorkflow, operatorList, client, verbose=False):
     installedOperators = client.documentService.findOperatorByOwnerLastModifiedDate('test', '')
 
+
+    # NOTE
     # Operator Id from reference workflow might be different than the current workflow instance
     # E.g.: Reference workflow is from remote instance while the test is being running locally
+    # 
+    # The first step, then, is to add the correct, installed operator id's to the workflow to be run
     for stpIdx in range(0, len(workflow.steps)):
         stp = workflow.steps[stpIdx]
-        #for stp in workflow.steps:
-        #         workflow.steps[stpIdx].model.operatorSettings.operatorRef.operatorId = operator.id
-        # workflow.steps[stpIdx].model.operatorSettings.operatorRef.name = operator.name
-        # workflow.steps[stpIdx].model.operatorSettings.operatorRef.url = operator.url
-        # workflow.steps[stpIdx].model.operatorSettings.operatorRef.version = operator.version
         
 
         if stp.__class__ == DataStep:
@@ -78,19 +79,14 @@ def update_operators(workflow, refWorkflow, operatorList, client, verbose=False)
             opUrl = stp.model.operatorSettings.operatorRef.url.uri
             opVersion = stp.model.operatorSettings.operatorRef.version
 
-            #opTag = '{}@{}'.format(opUrl, opVersion)
-            #comp = [opTag ==  '{}@{}'.format(iop.url.uri, iop.version) for iop in installedOperators]
-
-            # FIXME DEBUG from here
-            if opUrl != '':
-                operator = get_installed_operator(client, installedOperators, opName, opUrl, opVersion)
+            operator = get_installed_operator(client, installedOperators, opName, opUrl, opVersion)
 
 
 
-                workflow.steps[stpIdx].model.operatorSettings.operatorRef.operatorId = operator.id
-                workflow.steps[stpIdx].model.operatorSettings.operatorRef.name = operator.name
-                workflow.steps[stpIdx].model.operatorSettings.operatorRef.url = operator.url
-                workflow.steps[stpIdx].model.operatorSettings.operatorRef.version = operator.version
+            workflow.steps[stpIdx].model.operatorSettings.operatorRef.operatorId = operator.id
+            workflow.steps[stpIdx].model.operatorSettings.operatorRef.name = operator.name
+            workflow.steps[stpIdx].model.operatorSettings.operatorRef.url = operator.url
+            workflow.steps[stpIdx].model.operatorSettings.operatorRef.version = operator.version
 
 
 

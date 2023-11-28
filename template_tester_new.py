@@ -94,7 +94,7 @@ def parse_args(argv):
     toleranceType="relative"
 
 
-    cellranger = True
+    cellranger = False
 
     for opt, arg in opts:
         if opt == '-h':

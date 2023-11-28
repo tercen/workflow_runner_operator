@@ -9,7 +9,7 @@ setup(
     packages=["workflow_runner"],
     package_dir={'workflow_runner': '.' },
     install_requires=[
-        'tercen_python_client @ git+https://github.com/tercen/tercen_python_client@0.7.18'
+        'tercen_python_client @ git+https://github.com/tercen/tercen_python_client@0.8.5'
     ],
     entry_points={
     "console_scripts": [

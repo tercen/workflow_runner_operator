@@ -1,6 +1,4 @@
-import os , io
-import sys
-import json
+import os 
 
 import copy, string, random, tempfile, subprocess
 
@@ -11,8 +9,7 @@ from datetime import datetime
 from workflow_runner.util import msg, which
 
 
-from tercen.model.base import *
-from tercen.model.base import FileDocument,  InitState,  ImportGitDatasetTask, RunComputationTask
+from tercen.model.impl import *
 from tercen.client import context as tercen
 
 import numpy as np
@@ -114,12 +111,8 @@ def update_operators(workflow, refWorkflow, operatorList, client, verbose=False)
     return workflow
 
 
-def create_test_workflow(client, refWorkflow, workflowInfo, verbose=False):
-    if refWorkflow == None:
-        refWorkflow = client.workflowService.get(workflowInfo["workflowId"])
-        workflow = client.workflowService.copyApp(refWorkflow.id, refWorkflow.projectId)
-    else:
-        workflow = copy.deepcopy(refWorkflow)
+def create_test_workflow(client, templateWkf, workflowInfo, verbose=False):
+    workflow = copy.deepcopy(templateWkf)
 
     # READ list of operators from input json and update accordingly in the cloned workflow
     if hasattr(workflowInfo, "operators"):
@@ -129,13 +122,10 @@ def create_test_workflow(client, refWorkflow, workflowInfo, verbose=False):
 
     msg("Copying workflow", verbose)
     
-    # CLONE reference workflow (but doesn't create a new one just yet)
-    
-
-    workflow.name = "{}_{}".format(refWorkflow.name, datetime.now().strftime("%Y%m%d_%H%M%S"))
+    workflow.name = "{}_{}".format(templateWkf.name, datetime.now().strftime("%Y%m%d_%H%M%S"))
     workflow.id = ''
 
-    workflow = update_operators(workflow, refWorkflow, operatorList, client)
+    workflow = update_operators(workflow, templateWkf, operatorList, client)
     
     #FIXME If nothing changes, the cached version of the computedRelation is used
     # Not usually a problem, but then we cannot delete the new workflow if needed
@@ -163,7 +153,7 @@ def create_test_workflow(client, refWorkflow, workflowInfo, verbose=False):
     # Create the new workflow with the required changes
     workflow = client.workflowService.create(workflow)
 
-    return [workflow,refWorkflow]
+    return [workflow,templateWkf]
 
 def __file_relation(client, fileId):
     try:
@@ -412,109 +402,21 @@ def __get_table_schemas(joinOp, client):
     return tableSchemas
 
 # Separate function for legibility
-def update_table_relations(client, refWorkflow, workflow, filemap, user, gitToken, verbose=False, cellranger=False):
+def update_table_relations(client, workflow, gsWorkflow, inputFileList, user, gitToken, verbose=False, cellranger=False):
     msg("Setting up table step references in new workflow.", verbose)
-    if refWorkflow == None:
-        refWorkflow = client.workflowService.get(workflowInfo["workflowId"])
 
-    
-    if filemap == None:
-        # No filename of tableStep <-> filename association has been given
-        # Trying to derive it from the table step name
-        for i in range(0, len(refWorkflow.steps)):
-            if isinstance(refWorkflow.steps[i], TableStep):
-                stp = refWorkflow.steps[i]
-                filename = {"filename":stp.name} # This is not necessarily so
-                fileId = __get_file_id(client, user, filename, workflow.projectId, gitToken)
-                rr = __file_relation(client, fileId)
-                workflow.steps[i].model.relation = rr
-                workflow.steps[i].state.taskState = DoneState()
-
-    elif isinstance(filemap, str):
-
-        if filemap.startswith("repo:"):
-            # Download as local file first
-            filemap = filemap.split("repo:")[-1]
-            urlParts = filemap.split("@")
-
-            
-            gitCmd = 'https://github.com/{}/raw/main/{}'.format(urlParts[0], urlParts[1])
-            tmpDir = "{}/AA_{}".format(tempfile.gettempdir(), ''.join(random.choices(string.ascii_uppercase + string.digits, k=12)))
-
-            os.makedirs(tmpDir)
-
-            zipFileName = "{}/{}".format(tmpDir, urlParts[1].split("/")[-1])
-            subprocess.call(['wget', '-O', zipFileName, gitCmd])
-
-
-
-            #subprocess.call(["unzip", '-qq', '-d', tmpDir, '-o', zipFileName])
-
-            #res = __upload_file_as_table(client, filemap, workflow.projectId, user)
-            #TODO CHECK FILENAME
-            filemap = "file:{}".format(zipFileName)
-
-        if filemap.startswith("file:"):
-            #local file
-            filemap = filemap.split("file:")[-1]
-            res = __upload_file_as_table(client, filemap, workflow.projectId, user, cellranger)
-            filemap = res
-
-        filemap = {"filename":filemap}
-        for i in range(0, len(workflow.steps)):
-            
-            if isinstance(workflow.steps[i], TableStep):
-                #print( tableStepFiles[0])
-                if isinstance(filemap["filename"], str):
-                    fileId = __get_file_id(client, user, filemap, workflow.projectId, gitToken)
-                    rr = __file_relation(client, fileId)
-                    workflow.steps[i].model.relation = rr
-                    workflow.steps[i].state.taskState = DoneState()
-                else:
-                    # List of table schemas
-                    rel = CompositeRelation()
-                    nTables = len(filemap["filename"])
-
-                    if nTables > 1:
-                        # "Main" Table --> Table 1
-                        jop = utl.as_join_operator(filemap["filename"][0], [], [])
-                        rel.joinOperators = [jop]
-
-                        #FIXME
-                        # Currently, only 3 tables handles
-                        # If this code remains, then this should be adjusted
-                    
-                        # Col & Row Tables
-                        rel.mainRelation = utl.as_composite_relation(filemap["filename"][0])
-                        
-
-                        cNames = set([c.name for c in filemap["filename"][0].columns]  )
-                        jops = []
-                        for k in range(1, nTables):
-                            cNames2 = set([c.name for c in filemap["filename"][k].columns]  )
-                            joinNames = cNames.intersection(cNames2)
-                            jops.append(utl.as_join_operator(filemap["filename"][k], list(joinNames), list(joinNames)))
-
-                        rel.mainRelation.joinOperators = jops
-                    else:
-                        rel.mainRelation = utl.as_relation(filemap["filename"])
-        
-                    #wkf = client.workflowService.get(workflow.id)
-                    workflow.steps[i].model.relation = rel # ur
-                    workflow.steps[i].state.taskState = DoneState()
-        
-    else:
-        for tbf in filemap:
-            tblStepIdx = which([stp.id == tbf["stepId"] for stp in workflow.steps])
-            if not (isinstance(tblStepIdx, int) or len(tblStepIdx) > 0):
-                continue
-
-            fileId = __get_file_id(client, user, tbf, workflow.projectId, gitToken)
-            rr = __file_relation(client, fileId)
+    for gsStp in gsWorkflow.steps:
+        if isinstance(gsStp, TableStep):
+            # Number of steps might have changed
+            for i in range(0, len(workflow.steps)):
+                stp = workflow.steps[i]
+                if stp.id == gsStp.id:
+                    # rr = __file_relation(client, inputFileList[0].id)
            
+                    stp.model = gsStp.model
+                    stp.state.taskState = DoneState()
+                    
 
-            workflow.steps[tblStepIdx].model.relation = rr
-            workflow.steps[tblStepIdx].state.taskState = DoneState()
 
     client.workflowService.update(workflow)
 

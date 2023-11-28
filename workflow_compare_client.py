@@ -5,7 +5,7 @@ import numpy as np
 from workflow_runner.util import msg, which
 
 
-from tercen.model.base import *
+from tercen.model.impl import *
 import numpy as np
 import tercen.util.helper_functions as utl
 import tercen.http.HttpClientService as th
@@ -63,7 +63,7 @@ def compare_columns_metadata(colNames, refColNames):
 
     return results
 
-def compare_table(client, tableIdx, jop, refJop, referenceSchemaPath, tol=0, tolType="Absolute"):
+def compare_table(client, tableIdx, jop, refJop, tol=0, tolType="Absolute"):
     tableRes = {}
     hasDiff = False
 
@@ -79,34 +79,17 @@ def compare_table(client, tableIdx, jop, refJop, referenceSchemaPath, tol=0, tol
         )
 
         
-        # if isinstance(refStp.model.relation, SimpleRelation):
-        #     #sch = client.tableSchemaService.get(refStp.model.relation.id)
-            
-        #     tbl = pl.read_csv("{}/{}/data.csv".format(referenceSchemaPath, refStp.model.relation.id) )
-        #     refInNames = [c for c in tbl.columns]
-
-        # elif isinstance(refStp.model.relation, InMemoryRelation):
-        #     #refInNames = [c.name for c in refStp.model.relation.inMemoryTable.columns]
-        #     # TODO Check if this ever occurs in an exported workflow
-        #     tbl = pl.read_csv("{}/{}/data.csv", referenceSchemaPath, refStp.model.relation.id)            
-        #     refInNames = [c for c in tbl.columns]
-        # else:    
-        #     #sch = client.tableSchemaService.get(refStp.model.relation.relation.id)
-        #     #refInNames = [c.name for c in sch.columns]
-        #     tbl = pl.read_csv("{}/{}/data.csv".format(referenceSchemaPath, refStp.model.relation.relation.id) )
-        #     refInNames = [c for c in tbl.columns]
-
 
     if isinstance(refJop.rightRelation, SimpleRelation):
-        refTbl = pl.read_csv("{}/{}/data.csv".format( referenceSchemaPath, refJop.rightRelation.id))
-        # refSchema = client.tableSchemaService.get(
-        #     refJop.rightRelation.id
-        # )
+        # refTbl = pl.read_csv("{}/{}/data.csv".format( referenceSchemaPath, refJop.rightRelation.id))
+        refTbl = client.tableSchemaService.get(
+            refJop.rightRelation.id
+        )
     else:
-        refTbl = pl.read_csv("{}/{}/data.csv".format( referenceSchemaPath, refJop.rightRelation.relation.mainRelation.id))
-        # refSchema = client.tableSchemaService.get(
-        #     refJop.rightRelation.relation.mainRelation.id
-        # )
+        # refTbl = pl.read_csv("{}/{}/data.csv".format( referenceSchemaPath, refJop.rightRelation.relation.mainRelation.id))
+        refTbl = client.tableSchemaService.get(
+            refJop.rightRelation.relation.mainRelation.id
+        )
 
     # Compare schemas
     refColNames = [c for c in refTbl.columns]
@@ -230,51 +213,8 @@ def __get_colnames(cRel):
 
 
 #FIXME Not comparing Gather and Join steps at the moment
-def compare_step(client, tableIdx, stp, refStp, referenceSchemaPath, tol=0, tolType="absolute", tableComp=[], verbose=False):
+def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", tableComp=[], verbose=False):
     stepResult = {}
-    # NOTE Possibly unnecessary, but input data might change
-    # if(isinstance(stp, TableStep)):
-
-    #     if isinstance(stp.model.relation, SimpleRelation):
-    #         sch = client.tableSchemaService.get(stp.model.relation.id)
-    #         inNames = [c.name for c in sch.columns]
-    #     elif isinstance(stp.model.relation, InMemoryRelation):
-    #         inNames = [c.name for c in stp.model.relation.inMemoryTable.columns]
-    #     elif isinstance(stp.model.relation, CompositeRelation): 
-    #         inNames = __get_colnames(stp.model.relation)
-    #     else:    
-    #         sch = client.tableSchemaService.get(stp.model.relation.relation.id)
-    #         inNames = [c.name for c in sch.columns]
-
-
-        
-    #     if isinstance(refStp.model.relation, SimpleRelation):
-    #         #sch = client.tableSchemaService.get(refStp.model.relation.id)
-            
-    #         tbl = pl.read_csv("{}/{}/data.csv".format(referenceSchemaPath, refStp.model.relation.id) )
-    #         refInNames = [c for c in tbl.columns]
-
-    #     elif isinstance(refStp.model.relation, InMemoryRelation):
-    #         #refInNames = [c.name for c in refStp.model.relation.inMemoryTable.columns]
-    #         # TODO Check if this ever occurs in an exported workflow
-    #         tbl = pl.read_csv("{}/{}/data.csv", referenceSchemaPath, refStp.model.relation.id)            
-    #         refInNames = [c for c in tbl.columns]
-    #     else:    
-    #         #sch = client.tableSchemaService.get(refStp.model.relation.relation.id)
-    #         #refInNames = [c.name for c in sch.columns]
-    #         tbl = pl.read_csv("{}/{}/data.csv".format(referenceSchemaPath, refStp.model.relation.relation.id) )
-    #         refInNames = [c for c in tbl.columns]
-
-        
-
-
-    #     res = compare_columns_metadata(inNames, refInNames)
-
-
-    #     if len(res) > 0:
-    #         res["Name"] = stp.name
-    #         stepResult = {**stepResult, **res}
-    #         # resultDict["Steps"] = [res]
 
 
     if(isinstance(stp, DataStep)):
@@ -305,7 +245,7 @@ def compare_step(client, tableIdx, stp, refStp, referenceSchemaPath, tol=0, tolT
                 for k in range(0, len(joinOps)):
                     jop = joinOps[k]
                     refJop = refJoinOps[k]
-                    res = compare_table(client, tableIdx, jop, refJop, referenceSchemaPath, tol)
+                    res = compare_table(client, tableIdx, jop, refJop,  tol)
                     tableRes = res[0]
                     hasDiff = res[1]
                     
@@ -319,7 +259,7 @@ def compare_step(client, tableIdx, stp, refStp, referenceSchemaPath, tol=0, tolT
                         stepResult = {**stepResult, **tableRes}
     return stepResult
 
-def diff_workflow(client, workflow, refWorkflow, referenceSchemaPath, tol=0, tolType="absolute", verbose=False):
+def diff_workflow(client, workflow, refWorkflow,  tol=0, tolType="absolute", verbose=False):
     resultDict = []
 
     if len(workflow.steps) != len(refWorkflow.steps):
@@ -335,7 +275,7 @@ def diff_workflow(client, workflow, refWorkflow, referenceSchemaPath, tol=0, tol
             # UPLOAD current gs and workflow
             #if stp.state
             if isinstance(stp.state.taskState, DoneState) and isinstance(refStp.state.taskState, DoneState):
-                stepRes = compare_step(client, i, stp, refStp, referenceSchemaPath, tol, tolType, verbose)
+                stepRes = compare_step(client, i, stp, refStp,  tol, tolType, verbose)
                 # resultDict = {**resultDict, **stepRes}
                 if len(stepRes) > 0:
                     resultDict.append(stepRes)

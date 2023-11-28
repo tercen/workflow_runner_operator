@@ -8,6 +8,7 @@ from zipfile import ZipFile
 import tempfile, string, random
 
 sys.path.append("../")
+sys.path.append("./")
 
 from workflow_runner.util import msg, which
 from workflow_runner.workflow_setup_client import create_test_workflow, update_table_relations
@@ -187,7 +188,9 @@ def parse_args(argv):
     params["tolerance"] = tolerance
     params["toleranceType"] = toleranceType
 
-    # python3 template_tester.py  --templateRepo=tercen/workflow_lib_repo --templateVersion=latest --templatePath=template_mean_crabs_2.zip --gsRepo=tercen/workflow_lib_repo --gsVersion=latest --gsPath=golden_standard_mean_crabs_2.zip --projectId=2aa4e5e69e49703961f2af4c5e000dd1
+    # python3 template_tester.py  --templateRepo=tercen/workflow_lib_repo --templateVersion=latest 
+    # --templatePath=template_mean_crabs_2.zip 
+    # 
 
     
     params["templateVersion"] = templateVersion
@@ -462,7 +465,8 @@ if __name__ == '__main__':
     workflow = workflows[0]
     refWorkflow = workflows[1]
 
-
+    client.documentService.findWorkflowByTagOwnerCreatedDate("", "")
+    client.workflowService.findStartKeys("findWorkflowByTagOwnerCreatedDate","0000", "")
     
     if "filemap" in params and params["filemap"] != None:
         filemap = params["filemap"]

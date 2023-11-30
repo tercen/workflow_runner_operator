@@ -64,7 +64,7 @@ def __is_operator_installed(opName, opUrl, opVersion, installedOperators):
     comp = [opTag ==  '{}@{}@{}'.format(iop.name, iop.url.uri, iop.version) for iop in installedOperators]
 
 def update_operators(workflow, refWorkflow, operatorList, client, params, verbose=False):
-    installedOperators = client.documentService.findOperatorByOwnerLastModifiedDate('test', '')
+    installedOperators = client.documentService.findOperatorByOwnerLastModifiedDate(params['user'], '')
 
 
     # NOTE

@@ -23,11 +23,13 @@ import polars as pl
 
 
 
-def get_installed_operator(client, installedOperators, opName, opUrl, opVersion, verbose=False):
+def get_installed_operator(client, installedOperators, opName, opUrl, opVersion, user, verbose=False):
     opTag = '{}@{}@{}'.format(opName, opUrl, opVersion)
     comp = [opTag ==  '{}@{}@{}'.format(iop.name, iop.url.uri, iop.version) for iop in installedOperators]
 
-
+    if opTag == '':
+        return None
+    
     if not np.any(comp):
         # install the operator
         msg("Installing {}:{} from {}".format(opName, opVersion, opUrl), verbose)
@@ -38,7 +40,7 @@ def get_installed_operator(client, installedOperators, opName, opUrl, opVersion,
         
         installTask.testRequired = False
         installTask.isDeleted = False
-        installTask.owner = 'test'
+        installTask.owner = user
 
         installTask = client.taskService.create(installTask)
         client.taskService.runTask(installTask.id)
@@ -61,7 +63,7 @@ def __is_operator_installed(opName, opUrl, opVersion, installedOperators):
     opTag = '{}@{}@{}'.format(opName, opUrl, opVersion)
     comp = [opTag ==  '{}@{}@{}'.format(iop.name, iop.url.uri, iop.version) for iop in installedOperators]
 
-def update_operators(workflow, refWorkflow, operatorList, client, verbose=False):
+def update_operators(workflow, refWorkflow, operatorList, client, params, verbose=False):
     installedOperators = client.documentService.findOperatorByOwnerLastModifiedDate('test', '')
 
 
@@ -79,14 +81,14 @@ def update_operators(workflow, refWorkflow, operatorList, client, verbose=False)
             opUrl = stp.model.operatorSettings.operatorRef.url.uri
             opVersion = stp.model.operatorSettings.operatorRef.version
 
-            operator = get_installed_operator(client, installedOperators, opName, opUrl, opVersion)
+            operator = get_installed_operator(client, installedOperators, opName, opUrl, opVersion, params['user'])
 
 
-
-            workflow.steps[stpIdx].model.operatorSettings.operatorRef.operatorId = operator.id
-            workflow.steps[stpIdx].model.operatorSettings.operatorRef.name = operator.name
-            workflow.steps[stpIdx].model.operatorSettings.operatorRef.url = operator.url
-            workflow.steps[stpIdx].model.operatorSettings.operatorRef.version = operator.version
+            if operator != None:
+                workflow.steps[stpIdx].model.operatorSettings.operatorRef.operatorId = operator.id
+                workflow.steps[stpIdx].model.operatorSettings.operatorRef.name = operator.name
+                workflow.steps[stpIdx].model.operatorSettings.operatorRef.url = operator.url
+                workflow.steps[stpIdx].model.operatorSettings.operatorRef.version = operator.version
 
 
 
@@ -97,22 +99,22 @@ def update_operators(workflow, refWorkflow, operatorList, client, verbose=False)
 
         operator = get_installed_operator(client, installedOperators, op["name"], op["operatorURL"], op["version"])
 
-
-        stpIdx = which([op["stepId"] == stp.id for stp in refWorkflow.steps])
-        workflow.steps[stpIdx].model.operatorSettings.operatorRef.operatorId = operator.id
-        workflow.steps[stpIdx].model.operatorSettings.operatorRef.name = operator.name
-        workflow.steps[stpIdx].model.operatorSettings.operatorRef.url = operator.url
-        workflow.steps[stpIdx].model.operatorSettings.operatorRef.version = operator.version
+        if operator != None:
+            stpIdx = which([op["stepId"] == stp.id for stp in refWorkflow.steps])
+            workflow.steps[stpIdx].model.operatorSettings.operatorRef.operatorId = operator.id
+            workflow.steps[stpIdx].model.operatorSettings.operatorRef.name = operator.name
+            workflow.steps[stpIdx].model.operatorSettings.operatorRef.url = operator.url
+            workflow.steps[stpIdx].model.operatorSettings.operatorRef.version = operator.version
     
     return workflow
 
 
-def create_test_workflow(client, templateWkf, workflowInfo, verbose=False):
+def create_test_workflow(client, templateWkf, params, verbose=False):
     workflow = copy.deepcopy(templateWkf)
 
     # READ list of operators from input json and update accordingly in the cloned workflow
-    if hasattr(workflowInfo, "operators"):
-        operatorList = workflowInfo["operators"]
+    if hasattr(params, "operators"):
+        operatorList = params["operators"]
     else:
         operatorList = []
 
@@ -121,7 +123,7 @@ def create_test_workflow(client, templateWkf, workflowInfo, verbose=False):
     workflow.name = "{}_{}".format(templateWkf.name, datetime.now().strftime("%Y%m%d_%H%M%S"))
     workflow.id = ''
 
-    workflow = update_operators(workflow, templateWkf, operatorList, client)
+    workflow = update_operators(workflow, templateWkf, operatorList, client, params)
     
     #FIXME If nothing changes, the cached version of the computedRelation is used
     # Not usually a problem, but then we cannot delete the new workflow if needed

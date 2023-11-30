@@ -23,7 +23,7 @@ import polars as pl
 
 
 
-def get_installed_operator(client, installedOperators, opName, opUrl, opVersion, user, verbose=False):
+def get_installed_operator(client, installedOperators, opName, opUrl, opVersion, params, verbose=False):
     opTag = '{}@{}@{}'.format(opName, opUrl, opVersion)
     comp = [opTag ==  '{}@{}@{}'.format(iop.name, iop.url.uri, iop.version) for iop in installedOperators]
 
@@ -37,15 +37,17 @@ def get_installed_operator(client, installedOperators, opName, opUrl, opVersion,
         installTask.state = InitState()
         installTask.url.uri = opUrl
         installTask.version = opVersion
+        installTask.gitToken = params["gitToken"]
         
-        installTask.testRequired = False
+        installTask.testRequired = True
         installTask.isDeleted = False
-        installTask.owner = user
+        installTask.owner = params["user"]
 
         installTask = client.taskService.create(installTask)
         client.taskService.runTask(installTask.id)
         installTask = client.taskService.waitDone(installTask.id)
 
+        # if isinstance(installTask.state, DoneState):
         operator = client.operatorService.get(installTask.operatorId)
     else:
         idx = which(comp)
@@ -81,7 +83,7 @@ def update_operators(workflow, refWorkflow, operatorList, client, params, verbos
             opUrl = stp.model.operatorSettings.operatorRef.url.uri
             opVersion = stp.model.operatorSettings.operatorRef.version
 
-            operator = get_installed_operator(client, installedOperators, opName, opUrl, opVersion, params['user'])
+            operator = get_installed_operator(client, installedOperators, opName, opUrl, opVersion, params)
 
 
             if operator != None:
@@ -97,7 +99,7 @@ def update_operators(workflow, refWorkflow, operatorList, client, params, verbos
         #opTag = '{}@{}'.format(op["operatorURL"], op["version"])
         #comp = [opTag ==  '{}@{}'.format(iop.url.uri, iop.version) for iop in installedOperators]
 
-        operator = get_installed_operator(client, installedOperators, op["name"], op["operatorURL"], op["version"])
+        operator = get_installed_operator(client, installedOperators, op["name"], op["operatorURL"], op["version"], params)
 
         if operator != None:
             stpIdx = which([op["stepId"] == stp.id for stp in refWorkflow.steps])
@@ -260,7 +262,7 @@ def __get_file_id(client, user, tbf, projectId, gitToken):
 
 
 
-def __upload_file_as_table(client, filename, projectId, user, cellranger=False):
+# def __upload_file_as_table(client, filename, projectId, user, cellranger=False, params):
         
         #FIXME Will likely be removed later
         if cellranger == True:
@@ -269,7 +271,7 @@ def __upload_file_as_table(client, filename, projectId, user, cellranger=False):
 
             crOpIdx = which(  [op.name == "Cell Ranger" for op in opList]  )
             cellrangerOp = opList[crOpIdx]
-            cellrangerOp = get_installed_operator(client, installedOps, cellrangerOp.name, cellrangerOp.url.uri, cellrangerOp.version)
+            cellrangerOp = get_installed_operator(client, installedOps, cellrangerOp.name, cellrangerOp.url.uri, cellrangerOp.version, params)
 
             with open(filename, 'rb') as file_data:
                 bytesData = file_data.read()

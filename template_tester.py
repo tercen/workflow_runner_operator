@@ -76,9 +76,9 @@ def parse_args(argv):
 #python3 template_tester.py  --templateRepo=tercen/scRNAseq_basic_template_test --gsRepo=templateRepo=tercen/scRNAseq_basic_template_test --gsPath=tests/example_test_gs.zip
     serviceUri = 'http://127.0.0.1:5400'
 
-    templateRepo = "tercen/git_project_test" #"tercen/scRNAseq_basic_template_test" #'tercen/workflow_lib_repo'
+    templateRepo = None #"tercen/git_project_test"
     templateVersion = 'latest'
-    templateName =  "Simple" 
+    templateName =  None #"Simple" 
    
 
     gsName = 'gs01'

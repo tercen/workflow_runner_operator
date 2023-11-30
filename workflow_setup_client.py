@@ -27,7 +27,7 @@ def get_installed_operator(client, installedOperators, opName, opUrl, opVersion,
     opTag = '{}@{}@{}'.format(opName, opUrl, opVersion)
     comp = [opTag ==  '{}@{}@{}'.format(iop.name, iop.url.uri, iop.version) for iop in installedOperators]
 
-    if opTag == '':
+    if opTag == '@@' or opUrl == '':
         return None
     
     if not np.any(comp):

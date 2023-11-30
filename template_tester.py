@@ -66,7 +66,7 @@ def parse_args(argv):
     params = {}
     opts, args = getopt.getopt(argv,"",
                                ["templateRepo=", "templateName=", "cellranger",
-                                "gsName=", "gitToken="
+                                "gsName=", "gitToken=",
                                 "serviceUri=", "user=", "passw=", "authToken=",
                                  "tolerance=", "toleranceType=" ]
                                 )

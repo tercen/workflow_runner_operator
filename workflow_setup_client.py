@@ -47,8 +47,10 @@ def get_installed_operator(client, installedOperators, opName, opUrl, opVersion,
         client.taskService.runTask(installTask.id)
         installTask = client.taskService.waitDone(installTask.id)
 
-        # if isinstance(installTask.state, DoneState):
-        operator = client.operatorService.get(installTask.operatorId)
+        if isinstance(installTask.state, DoneState):
+            operator = client.operatorService.get(installTask.operatorId)
+        else:
+            raise Exception("Operator " + opTag + " failed. USER: " + params["user"]) 
     else:
         idx = which(comp)
         if isinstance(idx, list):

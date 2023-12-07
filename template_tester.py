@@ -73,8 +73,7 @@ def parse_args(argv):
     
     
 
-    #docker run --net=host template_tester:0.0.1 --templateRepo=tercen/git_project_test  --gitToken=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
-    serviceUri = 'http://127.0.0.1:5400'
+    #docker run --net=host template_tester:0.0.1 --templateRepo=tercen/git_project_test  --gitToken=ddd serviceUri = 'http://127.0.0.1:5400'
 
     templateRepo = "tercen/git_project_test"
    

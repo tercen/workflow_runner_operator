@@ -2,10 +2,11 @@ import sys
 import polars as pl
 import numpy as np
 
-from workflow_runner.util import msg, which
+from util import msg, which
 
 
 from tercen.model.impl import *
+import tercen.util.helper_functions as utl
 import numpy as np
 import tercen.util.helper_functions as utl
 import tercen.http.HttpClientService as th
@@ -63,33 +64,38 @@ def compare_columns_metadata(colNames, refColNames):
 
     return results
 
-def compare_table(client, tableIdx, jop, refJop, tol=0, tolType="Absolute"):
+
+def get_simple_relation_id_list(obj):
+    idList = []
+
+    if isinstance(obj, SimpleRelation):
+        idList.append(obj.id)
+    elif isinstance(obj, CompositeRelation):
+        idList.append(get_simple_relation_id_list(obj.mainRelation))
+        idList.append(get_simple_relation_id_list(obj.joinOperators))
+
+    elif isinstance(obj, RenameRelation):
+        cRel = obj.relation
+        idList.append(get_simple_relation_id_list(cRel.mainRelation))
+        idList.append(get_simple_relation_id_list(cRel.joinOperators))
+    elif isinstance(obj, list):
+        # Assumed: List of JoinOperator!
+        for o in obj:
+            idList.append(get_simple_relation_id_list(o.rightRelation))
+
+      
+
+        
+    
+    idList = utl.flatten(idList)
+    return idList
+
+
+def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="Absolute"):
     tableRes = {}
     hasDiff = False
 
 
-    if isinstance(jop.rightRelation, SimpleRelation):
-        schema = client.tableSchemaService.get(
-            jop.rightRelation.id
-        )
-        
-    else:
-        schema = client.tableSchemaService.get(
-            jop.rightRelation.relation.mainRelation.id
-        )
-
-        
-
-    if isinstance(refJop.rightRelation, SimpleRelation):
-        # refTbl = pl.read_csv("{}/{}/data.csv".format( referenceSchemaPath, refJop.rightRelation.id))
-        refSchema = client.tableSchemaService.get(
-            refJop.rightRelation.id
-        )
-    else:
-        # refSchema = pl.read_csv("{}/{}/data.csv".format( referenceSchemaPath, refJop.rightRelation.relation.mainRelation.id))
-        refSchema = client.tableSchemaService.get(
-            refJop.rightRelation.relation.mainRelation.id
-        )
 
     # Compare schemas
     refColNames = [c.name for c in refSchema.columns]
@@ -119,28 +125,25 @@ def compare_table(client, tableIdx, jop, refJop, tol=0, tolType="Absolute"):
             refCol = th.decodeTSON(client.tableSchemaService.selectStream(refSchema.id, [refColNames[ci]], 0, -1))
             colVals = col["columns"][0]["values"]
             refColVals = refCol["columns"][0]["values"]
-            #refCol = th.decodeTSON(ctx.context.client.tableSchemaService.selectStream(refSchema.id, [refColNames[ci]], 0, -1))
-            #refColVals = refCol["columns"][0]["values"]
-            # refColVals = refSchema[:,ci]
-            # refColType = polarDtype_to_numpyDtype(refSchema.dtypes[ci])
+
 
 
             
             if type(colVals[0]) != type(refColVals[0]):
                 hasDiff = True
-                k = 0 # FIXME Receive the table index for reporting here
+                
                 print(hasattr(tableRes, "ColType"))
                 if  "ColType" in tableRes:
                     
                     tableRes["ColType"].append( "Column tables do not match for Table {:d}, column {:d} : {} x {} (Reference vs Workflow)".format(
-                        k + 1,
+                        tableIdx + 1,
                         ci + 1,
                         refColType,
                         type(colVals[0]) 
                     ))
                 else:
                     tableRes["ColType"] = ["Column tables do not match for Table {:d}, column {:d} : {} x {} (Reference vs Workflow)".format(
-                        k + 1,
+                        tableIdx + 1,
                         ci + 1,
                         refColType,
                         type(colVals[0]) 
@@ -222,16 +225,18 @@ def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", tabl
     if(isinstance(stp, DataStep)):
         # If operator is not set, computedRelation will have no joinOperators
         if hasattr(stp.computedRelation, 'joinOperators'):
-            nOutTables = len(stp.computedRelation.joinOperators)
-            nOutTablesRef = len(refStp.computedRelation.joinOperators)
+            # "High-level" output tables
+            # Each join op might contain multiple related tables (e.g. .ri and .ci tables)
+            nOutJop = len(stp.computedRelation.joinOperators)
+            nOutJopRef = len(refStp.computedRelation.joinOperators)
 
             # Step comparison result dictionary
             stpRes = {"Name":stp.name}
             hasDiff = False
 
-            if nOutTables != nOutTablesRef:
-                stpRes["NumTables"] = "Number of output tables do not match: {:d} x {:d} (Reference vs Workflow)".format(
-                    nOutTablesRef, nOutTables )
+            if nOutJop != nOutJopRef:
+                stpRes["NumJop"] = "Number of JoinOperators do not match: {:d} x {:d} (Reference vs Template)".format(
+                    nOutJopRef, nOutJop )
 
                 #FIXME Issue #2 
                 # Produce more meaningful comparison for different number of tables
@@ -247,17 +252,24 @@ def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", tabl
                 for k in range(0, len(joinOps)):
                     jop = joinOps[k]
                     refJop = refJoinOps[k]
-                    res = compare_table(client, tableIdx, jop, refJop,  tol)
-                    tableRes = res[0]
-                    hasDiff = res[1]
-                    
 
+                    idList = get_simple_relation_id_list(jop.rightRelation)
+                    refIdList = get_simple_relation_id_list(refJop.rightRelation)
 
-                        
+                    if len(idList) != len(refIdList):
+                                stpRes["NumTables"] = "Number of Tables in JoinOperator {} \
+                                    do not match: {:d} x {:d} (GoldenStandard vs Template)".format(
+                                    k+1, len(refIdList), len(idList) )
+                    else:
+                        for w in range(0, len(idList)):
+                            schema = client.tableSchemaService.get(idList[5])
+                            refSchema = client.tableSchemaService.get(idList[5])
+                            res = compare_schema(client, w, schema, refSchema,  tol)
+                            tableRes = res[0]
+                            hasDiff = res[1]
 
                     if hasDiff == True:
                         tableRes["TableIdx"]:tableIdx+1
-
                         stepResult = {**stepResult, **tableRes}
     return stepResult
 
@@ -267,21 +279,19 @@ def diff_workflow(client, workflow, refWorkflow,  tol=0, tolType="absolute", ver
     if len(workflow.steps) != len(refWorkflow.steps):
         resultDict.append( {"NumOfSteps":"Number of steps between workflow and template are not equal: {} x {}".format(len(workflow.steps),  len(refWorkflow.steps))})
 
+    # NOTE Assume order of steps remains the same
     for i in range(0, len(workflow.steps)):
         if i < len(workflow.steps) and i < len(refWorkflow.steps):
             stp = workflow.steps[i]
             refStp = refWorkflow.steps[i]
 
-            #TODO
-            # Compare if fully ran or failed step
-            # UPLOAD current gs and workflow
-            #if stp.state
             if isinstance(stp.state.taskState, DoneState) and isinstance(refStp.state.taskState, DoneState):
                 stepRes = compare_step(client, i, stp, refStp,  tol, tolType, verbose)
-                # resultDict = {**resultDict, **stepRes}
+
                 if len(stepRes) > 0:
                     resultDict.append(stepRes)
             else:
+                # A step has not properly run, or has not run yet due to previous failure
                 if isinstance(stp.state.taskState, FailedState):
                     stepRes = {"Name":stp.name}
                     stepRes["TaskState"] = "Step did not run successfully"

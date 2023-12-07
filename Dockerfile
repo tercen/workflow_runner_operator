@@ -7,5 +7,5 @@ RUN python3 -m pip install -r ./requirements.txt
 
 ENV TERCEN_SERVICE_URI https://tercen.com
 
-ENTRYPOINT [ "python3", "main.py"]
+ENTRYPOINT [ "python3", "template_tester.py"]
 CMD [ "--taskId", "someid", "--serviceUri", "https://tercen.com", "--token", "sometoken"]

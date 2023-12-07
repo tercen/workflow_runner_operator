@@ -15,3 +15,13 @@ def which(arr):
     if len(trueIdx) == 1:
         trueIdx = trueIdx[0]
     return trueIdx
+
+
+def filter_by_type( objList, cls, parent=False ):
+    typeList = []
+    for o in objList:
+        if (parent == True and issubclass(o, cls)) or \
+            isinstance(o, cls ):
+            typeList.append(o)
+
+    return typeList

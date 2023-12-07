@@ -10,9 +10,9 @@ import tempfile, string, random
 sys.path.append("../")
 sys.path.append("./")
 
-from workflow_runner.util import msg, which
-from workflow_runner.workflow_setup_client import create_test_workflow, update_table_relations
-from workflow_runner.workflow_compare_client import diff_workflow
+from util import msg, which, filter_by_type
+from workflow_setup_client import setup_workflow, update_table_relations
+from workflow_compare_client import diff_workflow
 
 import tercen.util.helper_functions as utl
 
@@ -65,62 +65,42 @@ def run_workflow(workflow, project, client):
 def parse_args(argv):
     params = {}
     opts, args = getopt.getopt(argv,"",
-                               ["templateRepo=", "templateName=", "cellranger",
-                                "gsName=", "gitToken=",
+                               ["templateRepo=", "gitToken=",
                                 "serviceUri=", "user=", "passw=", "authToken=",
-                                 "tolerance=", "toleranceType=" ]
+                                 "tolerance=", "toleranceType=", "taskId=" ]
                                 )
 
     
     
-#python3 template_tester.py  --templateRepo=tercen/scRNAseq_basic_template_test --gsRepo=templateRepo=tercen/scRNAseq_basic_template_test --gsPath=tests/example_test_gs.zip
+
+    #docker run --net=host template_tester:0.0.1 --templateRepo=tercen/git_project_test  --gitToken=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
     serviceUri = 'http://127.0.0.1:5400'
 
-    templateRepo = None #"tercen/git_project_test"
-    templateVersion = 'latest'
-    templateName =  None #"Simple" 
+    templateRepo = "tercen/git_project_test"
    
-
-    gsName = 'gs01'
-    
 
     user = 'test'
     passw = 'test'
     authToken = ''
     gitToken = None
-    verbose = False
+    verbose = True
     
     tolerance = 0.001
     toleranceType="relative"
 
+    taskId = None
 
-    cellranger = False
 
     for opt, arg in opts:
         if opt == '-h':
             print('runner.py ARGS')
             sys.exit()
 
-        
-        if opt == '--templateVersion':
-            templateVersion = arg
-
-        if opt == '--cellranger':
-            cellranger = True
-        
         if opt == '--templateRepo':
             templateRepo = arg
 
-
-        if opt == '--templateName':
-            templateName = arg
-
-        if opt == '--gsName':
-            gsName = arg
-
         if opt == '--gitToken':
             gitToken = arg
-
 
         if opt == '--serviceUri':
             serviceUri = arg
@@ -143,16 +123,18 @@ def parse_args(argv):
         if opt == '--verbose':
             verbose = True
 
+        if opt == '--taskId':
+            taskId = arg
 
     
-    if templateVersion == "latest":
-        templateVersion = "main"
-
     client = TercenClient(serviceUri)
     client.userService.connect(user, passw)
+    
 
     params["client"] = client
     params["user"] = user
+
+    params["taskId"] = taskId
 
 
     params["verbose"] = verbose
@@ -162,12 +144,7 @@ def parse_args(argv):
    
     templateRepo = "https://github.com/" + templateRepo
 
-    params["templateVersion"] = templateVersion
     params["templateRepo"] = templateRepo
-    params["templateName"] = templateName
-    params["gsName"] = gsName
-    
-    params["cellranger"] = cellranger
         
     if gitToken == None and "GITHUB_TOKEN" in os.environ:
         gitToken = os.environ["GITHUB_TOKEN"]
@@ -193,8 +170,8 @@ def run(argv):
     project = client.projectService.create(project)
     params["projectId"] = project.id
 
-    project = client.projectService.get(params["projectId"])
-
+    # FIXME Test and Remove
+    #project = client.projectService.get(params["projectId"])
 
     importTask = GitProjectTask()
     importTask.owner = params['user']
@@ -205,69 +182,67 @@ def run(argv):
     importTask.addMeta("GIT_ACTION", "reset/pull")
     importTask.addMeta("GIT_PAT", params["gitToken"])
     importTask.addMeta("GIT_URL", params["templateRepo"])
-    importTask.addMeta("GIT_BRANCH", params["templateVersion"])
+    #TODO Have it as parameter, perhaps
+    importTask.addMeta("GIT_BRANCH", "main")
     importTask.addMeta("GIT_MESSAGE", "")
     importTask.addMeta("GIT_TAG", "")
 
 
-    
     importTask = client.taskService.create(importTask)
     client.taskService.runTask(importTask.id)
     importTask = client.taskService.waitDone(importTask.id)
     
     objs = client.persistentService.getDependentObjects(project.id)
-
+    #FIXME filter objs array by type, then find by name
+    workflowList = filter_by_type(objs, Workflow)
+    # schemaList = filter_by_type(objs, Schema)
     inputFileList = []
 
-    for o in objs:
-        if isinstance(o, Workflow) and o.name == params["templateName"]:
-            wkf = o
-
-        if isinstance(o, Workflow) and o.name == params["templateName"]+"_"+params["gsName"]:
-            gsWkf = o
-
-        if isinstance(o, Schema):
-            inputFileList.append(o)
-
-    # FIXME Take DEFAULT values as parameters
     verbose = params["verbose"]
-
     resultList = []
+    for w in workflowList:
+        
+        # TODO Check conventions here actually
+        wkfName = w.name
+        
+        nameParts = wkfName.split("_")
+        if not (nameParts[-1].startswith("gs") and len(nameParts) > 1):
+            wkf = w
 
-    msg( "Starting Workflow Runner.", verbose )
-    # msg( "Testing template {}/{}.".format(params["templateRepo"], params["templatePath"]), verbose )
+            
+            for w2 in workflowList:
+                nameParts = w2.name.split("_")
+                if w2.name == (wkfName + "_" + nameParts[-1]):
+                    gsWkf = w2
 
-    workflows = create_test_workflow(client, wkf, params, verbose=verbose)
-    workflow = workflows[0]
-    # templateWorkflow = workflows[1]
+            
+            msg( "Starting Workflow Runner.", verbose )
+            msg( "Testing template {} against {}.".format(wkfName, gsWkf.name ), verbose )
 
+    
+
+            workflowRun = setup_workflow(client, wkf, gsWkf=gsWkf, \
+                                 params=params, update_operator_version=False, \
+                                 verbose=verbose)
         
 
-    try:
-        update_table_relations(client, workflow, gsWkf, inputFileList, params["user"], params["gitToken"], verbose=verbose, cellranger=params["cellranger"])
-        
-    except FileNotFoundError as e:
-        print(e)
-        workflow.steps = []
-        client.workflowService.update(workflow)
-        client.workflowService.delete(workflow.id, workflow.rev)
-        sys.exit(1)
-
-    msg("Running all steps", verbose)
 
 
-    run_workflow(workflow, project, client)
-    msg("Finished", verbose)
+            msg("Running all steps", verbose)
 
-    # Retrieve the updated, ran workflow
-    workflow = client.workflowService.get(workflow.id)
+
+            run_workflow(workflowRun, project, client)
+            msg("Finished", verbose)
+
+            # Retrieve the updated, ran workflow
+            workflowRun = client.workflowService.get(workflowRun.id)
 
  
 #    try:
-    resultDict = diff_workflow(client, workflow, gsWkf,  params["tolerance"],
-                            params["toleranceType"], verbose)
+            resultDict = diff_workflow(client, workflowRun, gsWkf,  params["tolerance"],
+                                    params["toleranceType"], verbose)
 
-    resultList.append(resultDict)
+            resultList.append({wkfName: resultDict})   
 #    except Exception as e:
 #        print(e)
     

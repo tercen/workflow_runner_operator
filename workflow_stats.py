@@ -3,13 +3,11 @@ import sys
 sys.path.append('./')
 sys.path.append('../../')
 
-from util import msg, which
+from .util import msg, which
 
 
 from tercen.model.base import *
-import numpy as np
 
-import tercen.http.HttpClientService as th
 
 
 

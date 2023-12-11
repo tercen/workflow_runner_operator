@@ -1,8 +1,7 @@
-import sys
 import polars as pl
 import numpy as np
 
-from util import msg, which
+from .util import msg, which
 
 
 from tercen.model.impl import *

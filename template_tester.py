@@ -11,8 +11,8 @@ sys.path.append("../")
 sys.path.append("./")
 
 from .util import msg, filter_by_type
-from workflow_setup_client import setup_workflow 
-from workflow_compare_client import diff_workflow
+from .workflow_setup_client import setup_workflow 
+from .workflow_compare_client import diff_workflow
 
 
 from tercen.client.factory import TercenClient

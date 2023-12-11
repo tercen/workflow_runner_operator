@@ -10,11 +10,9 @@ import tempfile, string, random
 sys.path.append("../")
 sys.path.append("./")
 
-from util import msg, which, filter_by_type
-from workflow_setup_client import setup_workflow, update_table_relations
+from .util import msg, filter_by_type
+from workflow_setup_client import setup_workflow 
 from workflow_compare_client import diff_workflow
-
-import tercen.util.helper_functions as utl
 
 
 from tercen.client.factory import TercenClient
@@ -192,7 +190,6 @@ def run(argv):
     importTask = client.taskService.waitDone(importTask.id)
     
     objs = client.persistentService.getDependentObjects(project.id)
-    #FIXME filter objs array by type, then find by name
     workflowList = filter_by_type(objs, Workflow)
     # schemaList = filter_by_type(objs, Schema)
     inputFileList = []
@@ -201,7 +198,6 @@ def run(argv):
     resultList = []
     for w in workflowList:
         
-        # TODO Check conventions here actually
         wkfName = w.name
         
         nameParts = wkfName.split("_")

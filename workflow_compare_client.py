@@ -261,8 +261,8 @@ def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", tabl
                                     k+1, len(refIdList), len(idList) )
                     else:
                         for w in range(0, len(idList)):
-                            schema = client.tableSchemaService.get(idList[5])
-                            refSchema = client.tableSchemaService.get(idList[5])
+                            schema = client.tableSchemaService.get(idList[k])
+                            refSchema = client.tableSchemaService.get(idList[k])
                             res = compare_schema(client, w, schema, refSchema,  tol)
                             tableRes = res[0]
                             hasDiff = res[1]

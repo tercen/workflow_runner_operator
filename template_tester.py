@@ -1,23 +1,26 @@
 import os 
-import sys, getopt, glob, shutil, subprocess
+import sys, getopt
 import json
 import polars as pl
 import numpy as np
-from zipfile import ZipFile
 
-import tempfile, string, random
+
+import string, random
 
 sys.path.append("../")
 sys.path.append("./")
 
-from .util import msg, filter_by_type
-from .workflow_setup_client import setup_workflow 
-from .workflow_compare_client import diff_workflow
+from util import msg, filter_by_type
+from workflow_setup_client import setup_workflow 
+from workflow_compare_client import diff_workflow
 
-
+#TODO Try workflow with documentId, readFCS
 from tercen.client.factory import TercenClient
 
 from tercen.model.impl import RunWorkflowTask, InitState,  Workflow, Project, GitProjectTask, Schema
+
+class WorkflowComparisonError(Exception):
+    pass
 
 def numpy_to_list(obj):
     if isinstance(obj, np.ndarray):
@@ -63,7 +66,8 @@ def run_workflow(workflow, project, client):
 def parse_args(argv):
     params = {}
     opts, args = getopt.getopt(argv,"",
-                               ["templateRepo=", "gitToken=",
+                               ["templateRepo=", "gitToken=", "tag=", "branch=",
+                                "update_operator=",
                                 "serviceUri=", "user=", "passw=", "authToken=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
@@ -72,21 +76,26 @@ def parse_args(argv):
     
 
     #docker run --net=host template_tester:0.0.1 --templateRepo=tercen/git_project_test  --gitToken=ddd serviceUri = 'http://127.0.0.1:5400'
-
-    templateRepo = "tercen/git_project_test"
+    # FIXME DEBUG
+    templateRepo = None
    
 
-    user = 'test'
-    passw = 'test'
-    authToken = ''
+    params["user"] = 'test'
+    params["passw"] = 'test'
+    params["authToken"] = ''
     gitToken = None
-    verbose = True
+    params["verbose"] = True
+    params["tag"] = ''
+    params["branch"] = 'main'
+
+    params["update_operator"] = False
     
-    tolerance = 0.001
-    toleranceType="relative"
+    params["tolerance"] = 0.001
+    params["toleranceType"] = "relative"
 
-    taskId = None
+    params["taskId"] = None
 
+    params["serviceUri"] = "http://127.0.0.1:5400"
 
     for opt, arg in opts:
         if opt == '-h':
@@ -100,44 +109,43 @@ def parse_args(argv):
             gitToken = arg
 
         if opt == '--serviceUri':
-            serviceUri = arg
+            params["serviceUri"] = arg
 
         if opt == '--user':
-            user = arg
+            params["user"] = arg
         
         if opt == '--passw':
-            passw = arg
+            params["passw"] = arg
         
         if opt == '--authToken':
-            authToken = arg
+            params["authToken"] = arg
 
         if opt == '--tolerance':
-            tolerance = float(arg)
+            params["tolerance"] = float(arg)
 
         if opt == '--toleranceType':
-            toleranceType = arg
+            params["toleranceType"] = arg
+
+        if opt == '--tag':
+            params["tag"] = arg
+
+        if opt == '--branch':
+            params["branch"] = arg
 
         if opt == '--verbose':
-            verbose = True
+            params["verbose"] = True
 
         if opt == '--taskId':
-            taskId = arg
+            params["taskId"] = arg
+
+        if opt == params["update_operator"]:
+            params["update_operator"] = arg
 
     
-    client = TercenClient(serviceUri)
-    client.userService.connect(user, passw)
-    
+    client = TercenClient(params["serviceUri"])
+    client.userService.connect(params["user"], params["passw"])
 
     params["client"] = client
-    params["user"] = user
-
-    params["taskId"] = taskId
-
-
-    params["verbose"] = verbose
-    params["tolerance"] = tolerance
-    params["toleranceType"] = toleranceType
-
    
     templateRepo = "https://github.com/" + templateRepo
 
@@ -153,109 +161,114 @@ def parse_args(argv):
 
 
 def run(argv):
-    absPath = os.path.dirname(os.path.abspath(__file__))
-    
     params = parse_args(argv)
     client = params["client"]
     
-
-    # Create temp project to run tests
-    project = Project()
-    project.name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
-    project.name = 'template_test_' + project.name
-    project.acl.owner = params['user']
-    project = client.projectService.create(project)
-    params["projectId"] = project.id
-
-    # FIXME Test and Remove
-    #project = client.projectService.get(params["projectId"])
-
-    importTask = GitProjectTask()
-    importTask.owner = params['user']
-    importTask.state = InitState()
-
-    importTask.addMeta("PROJECT_ID", project.id)
-    importTask.addMeta("PROJECT_REV", project.rev)
-    importTask.addMeta("GIT_ACTION", "reset/pull")
-    importTask.addMeta("GIT_PAT", params["gitToken"])
-    importTask.addMeta("GIT_URL", params["templateRepo"])
-    #TODO Have it as parameter, perhaps
-    importTask.addMeta("GIT_BRANCH", "main")
-    importTask.addMeta("GIT_MESSAGE", "")
-    importTask.addMeta("GIT_TAG", "")
-
-
-    importTask = client.taskService.create(importTask)
-    client.taskService.runTask(importTask.id)
-    importTask = client.taskService.waitDone(importTask.id)
     
-    objs = client.persistentService.getDependentObjects(project.id)
-    workflowList = filter_by_type(objs, Workflow)
-    # schemaList = filter_by_type(objs, Schema)
-    inputFileList = []
+    if params["taskId"] != None:
+        # TODO Run as operator
+        pass
+    
+    try:
+        # Create temp project to run tests
+        project = Project()
+        project.name = 'template_test_' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
+        project.acl.owner = params['user']
+        project = client.projectService.create(project)
+        params["projectId"] = project.id
 
-    verbose = params["verbose"]
-    resultList = []
-    for w in workflowList:
-        
-        wkfName = w.name
-        
-        nameParts = wkfName.split("_")
-        if not (nameParts[-1].startswith("gs") and len(nameParts) > 1):
-            wkf = w
+        # Clone the template project from git
+        importTask = GitProjectTask()
+        importTask.owner = params['user']
+        importTask.state = InitState()
 
+        importTask.addMeta("PROJECT_ID", project.id)
+        importTask.addMeta("PROJECT_REV", project.rev)
+        importTask.addMeta("GIT_ACTION", "reset/pull")
+        importTask.addMeta("GIT_PAT", params["gitToken"])
+        importTask.addMeta("GIT_URL", params["templateRepo"])
+        
+        importTask.addMeta("GIT_BRANCH",params["branch"])
+        importTask.addMeta("GIT_MESSAGE", "")
+        importTask.addMeta("GIT_TAG", params["tag"])
+
+
+        importTask = client.taskService.create(importTask)
+        client.taskService.runTask(importTask.id)
+        importTask = client.taskService.waitDone(importTask.id)
+        
+        objs = client.persistentService.getDependentObjects(project.id)
+        workflowList = filter_by_type(objs, Workflow)
+
+
+        verbose = params["verbose"]
+        resultList = []
+
+        allPass = True
+        for w in workflowList:
             
-            for w2 in workflowList:
-                nameParts = w2.name.split("_")
-                if w2.name == (wkfName + "_" + nameParts[-1]):
-                    gsWkf = w2
+            wkfName = w.name
 
+            # FIXME DEBUG
+            #if not wkfName.startswith("Complex"):
+            # if wkfName != "WizardWkf":
+            #     continue
+                
             
-            msg( "Starting Workflow Runner.", verbose )
-            msg( "Testing template {} against {}.".format(wkfName, gsWkf.name ), verbose )
+            nameParts = wkfName.split("_")
+            if not (nameParts[-1].startswith("gs") and len(nameParts) > 1):
+                wkf = w
+                gsWkf = None
+                for w2 in workflowList:
+                    nameParts = w2.name.split("_")
+                    if w2.name == (wkfName + "_" + nameParts[-1]):
+                        gsWkf = w2
 
-    
+                        
+                        msg( "Testing template {} against {}.".format(wkfName, gsWkf.name ), verbose )
+                        
+                        workflowRun = setup_workflow(client, wkf, gsWkf=gsWkf, params=params)
+                    
 
-            workflowRun = setup_workflow(client, wkf, gsWkf=gsWkf, \
-                                 params=params, update_operator_version=False, \
-                                 verbose=verbose)
+                        msg("Running all steps", verbose)
+                        run_workflow(workflowRun, project, client)
+                        msg("Finished", verbose)
+
+                        # Retrieve the updated, ran workflow
+                        workflowRun = client.workflowService.get(workflowRun.id)
+
+
+                        resultDict = diff_workflow(client, workflowRun, gsWkf,  params["tolerance"],
+                                                params["toleranceType"], verbose)
+
+
+                        if len(resultDict) > 0:
+                            resultList.append({w2.name: resultDict[0]})   
+                            allPass = False
+                            msg("Workflow run was FAILED", verbose)
+                        else:
+                            msg("Workflow run was SUCCESSFUL", verbose)
+
+        if allPass == False:
+            with open('test_results.json', 'w', encoding='utf-8') as f:
+                json.dump(resultList, f, ensure_ascii=False, indent=4)     
+            raise WorkflowComparisonError
+
+    except Exception as e:
+        if type(e) == WorkflowComparisonError:
+            # Runner executed succesfully, but workflow comparison failed
+            # Pass the failure to github action, so the GA workflow fails
+            raise
+
+        msg("Workflow runner failed with error: ", True)
+        msg(e.with_traceback(), True)
+
+        with open('test_results.json', 'w', encoding='utf-8') as f:
+            json.dump({"Failure":e.with_traceback()}, f, ensure_ascii=False, indent=4)
         
-
-
-
-            msg("Running all steps", verbose)
-
-
-            run_workflow(workflowRun, project, client)
-            msg("Finished", verbose)
-
-            # Retrieve the updated, ran workflow
-            workflowRun = client.workflowService.get(workflowRun.id)
-
- 
-#    try:
-            resultDict = diff_workflow(client, workflowRun, gsWkf,  params["tolerance"],
-                                    params["toleranceType"], verbose)
-
-            resultList.append({wkfName: resultDict})   
-#    except Exception as e:
-#        print(e)
-    
-        
-
-        
-
-
-    client.workflowService.delete(project.id, project.rev)
-    print(resultList)
-
-    # # Remove tmp files and zip file
-    # fileList = glob.glob("{}/*".format(tmpDir), recursive=False)
-    # for f in fileList:
-    #     if os.path.isdir(f):
-    #         shutil.rmtree(f)
-    #     else:
-    #         os.unlink(f)
+    finally:
+        if project != None and client != None:
+            client.workflowService.delete(project.id, project.rev)
 
 
 

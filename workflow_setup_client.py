@@ -1,7 +1,7 @@
 import copy
 from datetime import datetime
 
-from .util import msg, which
+from util import msg, which
 
 
 from tercen.model.impl import *
@@ -15,7 +15,8 @@ from pytson import encodeTSON
 
 
 
-def get_installed_operator(client, installedOperators, opName, opUrl, opVersion, params, verbose=False):
+def get_installed_operator(client,  opName, opUrl, opVersion, params, verbose=False):
+    installedOperators = client.documentService.findOperatorByOwnerLastModifiedDate(params['user'], '')
     opTag = '{}@{}@{}'.format(opName, opUrl, opVersion)
     comp = [opTag ==  '{}@{}@{}'.format(iop.name, iop.url.uri, iop.version) for iop in installedOperators]
 
@@ -42,7 +43,7 @@ def get_installed_operator(client, installedOperators, opName, opUrl, opVersion,
         if isinstance(installTask.state, DoneState):
             operator = client.operatorService.get(installTask.operatorId)
         else:
-            raise Exception("Operator " + opTag + " failed. USER: " + params["user"]) 
+            raise RuntimeError("Installation of operator " + opTag + " failed. USER: " + params["user"]) 
     else:
         idx = which(comp)
         if isinstance(idx, list):
@@ -50,17 +51,10 @@ def get_installed_operator(client, installedOperators, opName, opUrl, opVersion,
 
         operator = installedOperators[idx]
 
-        # print("Adding {}:{}".format(operator.name, operator.version))
-
-
     return operator
     
-def __is_operator_installed(opName, opUrl, opVersion, installedOperators):
-    opTag = '{}@{}@{}'.format(opName, opUrl, opVersion)
-    comp = [opTag ==  '{}@{}@{}'.format(iop.name, iop.url.uri, iop.version) for iop in installedOperators]
-
-def update_operators( workflow, client, params,  verbose=False):
-    installedOperators = client.documentService.findOperatorByOwnerLastModifiedDate(params['user'], '')
+def update_operators( workflow, client, params):
+    
     operatorLib = client.documentService.getTercenOperatorLibrary(0, 300)
 
 
@@ -69,16 +63,20 @@ def update_operators( workflow, client, params,  verbose=False):
             opName = workflow.steps[stpIdx].model.operatorSettings.operatorRef.name
             opVersion = workflow.steps[stpIdx].model.operatorSettings.operatorRef.version
 
-
+            # Might have multiple versions, get latest
             opIdx = which([op.name == opName for op in operatorLib])
 
             if opIdx != []:
+                if len(opIdx) > 1:
+                    #TODO if there are multiple versions, find the latest
+                    pass
+
                 libOp = operatorLib[opIdx]
                 if libOp.version > opVersion:
                     msg("Updating {} operator from version {} to version {}".format(\
-                        opName, libOp.version, opVersion), verbose)
+                        opName, libOp.version, opVersion), params["verbose"])
                     
-                    operator = get_installed_operator(client, installedOperators, \
+                    operator = get_installed_operator(client,  \
                                                       libOp.name, \
                                                       libOp.url.uri, libOp.version, params)
                     
@@ -90,50 +88,45 @@ def update_operators( workflow, client, params,  verbose=False):
     return workflow
 
 
-def setup_workflow(client, templateWkf, gsWkf, params, update_operator_version=False, verbose=False):
+def setup_workflow(client, templateWkf, gsWkf, params):
     # Copy is wanted in the case of multiple golden standards being tested
-    msg("Copying workflow", verbose)
-    workflow = copy.deepcopy(templateWkf)
+    msg("Copying workflow", params["verbose"])
 
+
+    workflow = copy.deepcopy(templateWkf)
     workflow.name = "{}_{}".format(templateWkf.name, datetime.now().strftime("%Y%m%d_%H%M%S"))
     workflow.id = ''
 
-    if update_operator_version == True:
-        msg("Checking for updated operator versions", verbose)
-        workflow = update_operators( workflow, client, params, verbose)
+    if params["update_operator"] == True:
+        msg("Checking for updated operator versions", params["verbose"])
+        workflow = update_operators( workflow, client, params)
     
+
     #FIXME If nothing changes, the cached version of the computedRelation is used
     # Not usually a problem, but then we cannot delete the new workflow if needed
     # because it indicates a dependency to the reference workflow
     for stp in workflow.steps:
         if hasattr(stp, "computedRelation"):
             #TODO Check if this factor actually exists
-            # Operators (like downsample) might ot have it
-            yFac = stp.model.axis.xyAxis[0].yAxis.graphicalFactor
-            nf = NamedFilter()
-            fe = FilterExpr()
-            fe.factor = yFac.factor
-            fe.filterOp = 'notequals'
-            fe.stringValue = '-98765456789'
-            nf.filterExprs = [fe] 
-            nf.logical = 'or'
-            nf.isNot = False
-            nf.name = yFac.factor.name
-            stp.model.filters.namedFilters.append(nf)
-            
+            # Operators (like downsample) might not have it
+            # NOTE Adding a filter to avoid caches will break wizard steps
+            # Some new strategy here is needed
+            stp.model.axis.xyAxis[0].yAxis.axisExtent.y = \
+                stp.model.axis.xyAxis[0].yAxis.axisExtent.y+0.1           
+
         
         stp.state.taskState = InitState()
 
+    
     workflow = client.workflowService.create(workflow)
 
-    try:
-        update_table_relations(client, workflow, gsWkf, verbose=verbose )
-    except FileNotFoundError as e:
-        print(e)
-        workflow.steps = []
-        client.workflowService.delete(workflow.id, workflow.rev)
 
+    update_table_relations(client, workflow, gsWkf, verbose=params["verbose"] )
+    update_wizard_factors(client, workflow, gsWkf, verbose=params["verbose"] )
 
+    workflow.addMeta("RUN_WIZARD_STEP", "true")
+
+    client.workflowService.update(workflow)
 
     return workflow
 
@@ -151,9 +144,24 @@ def update_table_relations(client, workflow, gsWorkflow, verbose=False):
                 if stp.id == gsStp.id:
                     stp.model = copy.deepcopy(gsStp.model)
                     stp.state.taskState = DoneState()
+                    stp.name = gsStp.name
+                    
+
+def update_wizard_factors(client, workflow, gsWorkflow, verbose=False):
+    msg("Updating Wizard factors.", verbose)
+
+    for gsStp in gsWorkflow.steps:
+        if isinstance(gsStp, WizardStep):
+            # Number of steps might have changed
+            for i in range(0, len(workflow.steps)):
+                stp = workflow.steps[i]
+                # NOTE Assumes the golden standard was a clone of an execution of the template
+                # This assumption MIGHT NOT hold
+                if stp.id == gsStp.id:
+                    stp.model = copy.deepcopy(gsStp.model)
                     
 
 
-    client.workflowService.update(workflow)
+    
 
     

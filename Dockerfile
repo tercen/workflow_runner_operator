@@ -1,4 +1,4 @@
-FROM tercen/runtime-python39:0.0.3
+FROM tercen/runtime-python39:0.1.0
 
 COPY . /operator
 WORKDIR /operator

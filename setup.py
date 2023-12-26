@@ -4,7 +4,7 @@ from setuptools import setup #, find_packages
 
 setup(
     name='workflow_runner',
-    version='0.0.1',
+    version='0.1.0',
     #packages=find_packages(exclude=['workflow_files']),
     packages=["workflow_runner"],
     package_dir={'workflow_runner': '.' },

@@ -1,7 +1,7 @@
 import polars as pl
 import numpy as np
 
-from .util import msg, which
+from util import msg, which
 
 
 from tercen.model.impl import *
@@ -90,7 +90,7 @@ def get_simple_relation_id_list(obj):
     return idList
 
 
-def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="Absolute"):
+def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="Absolute", verbose=False):
     tableRes = {}
     hasDiff = False
 
@@ -116,10 +116,8 @@ def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="Absolute
     else:
         # Same number of columns and same number of rows
         # We can compare values column-wise
-        
-        
         for ci in range(0, len(colNames)):
-            msg("Comparing {} against {}".format(colNames[ci], refColNames[ci]))
+            msg("Comparing {} against {}".format(colNames[ci], refColNames[ci]), verbose=verbose)
             col = th.decodeTSON(client.tableSchemaService.selectStream(schema.id, [colNames[ci]], 0, -1))
             refCol = th.decodeTSON(client.tableSchemaService.selectStream(refSchema.id, [refColNames[ci]], 0, -1))
             colVals = col["columns"][0]["values"]
@@ -222,7 +220,7 @@ def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", tabl
 
 
     if(isinstance(stp, DataStep)):
-        # If operator is not set, computedRelation will have no joinOperators
+        # If operator is not set, computedRelation will have no joinOperators and nothing to compare
         if hasattr(stp.computedRelation, 'joinOperators'):
             # "High-level" output tables
             # Each join op might contain multiple related tables (e.g. .ri and .ci tables)
@@ -237,39 +235,53 @@ def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", tabl
                 stpRes["NumJop"] = "Number of JoinOperators do not match: {:d} x {:d} (Reference vs Template)".format(
                     nOutJopRef, nOutJop )
 
-                #FIXME Issue #2 
-                # Produce more meaningful comparison for different number of tables
-                for k in range(0, len(tableComp)):
-                    if tableComp["stepId"] == stp.id:
-                        tblIdxStrList = tableComp["indexComparison"]
-                        pass
-            else:
-                joinOps = stp.computedRelation.joinOperators
-                refJoinOps = refStp.computedRelation.joinOperators
+            joinOps = stp.computedRelation.joinOperators
+            refJoinOps = refStp.computedRelation.joinOperators
 
-                # Table to table comparison
-                for k in range(0, len(joinOps)):
+            # Table to table comparison
+            k = 0
+            while k < len(joinOps) or k < len(refJoinOps):
+                
+                if k < len(joinOps):
                     jop = joinOps[k]
+                else:
+                    stpRes["JopNum"] = "JoinOperator {} \
+                                is present only in the Golden Standard workflow".format(
+                                k+1 )
+                    k = k + 1
+                    continue
+
+                if k < len(refJoinOps):
                     refJop = refJoinOps[k]
+                else:
+                    stpRes["JopNum"] = "JoinOperator {} \
+                                is present only in the Template workflow".format(
+                                k+1 )
+                    k = k + 1
+                    continue
 
-                    idList = get_simple_relation_id_list(jop.rightRelation)
-                    refIdList = get_simple_relation_id_list(refJop.rightRelation)
+                idList = get_simple_relation_id_list(jop.rightRelation)
+                refIdList = get_simple_relation_id_list(refJop.rightRelation)
 
-                    if len(idList) != len(refIdList):
-                                stpRes["NumTables"] = "Number of Tables in JoinOperator {} \
-                                    do not match: {:d} x {:d} (GoldenStandard vs Template)".format(
-                                    k+1, len(refIdList), len(idList) )
-                    else:
-                        for w in range(0, len(idList)):
-                            schema = client.tableSchemaService.get(idList[k])
-                            refSchema = client.tableSchemaService.get(idList[k])
-                            res = compare_schema(client, w, schema, refSchema,  tol)
-                            tableRes = res[0]
-                            hasDiff = res[1]
+                if len(idList) != len(refIdList):
+                            stpRes["NumTables"] = "Number of Relations in JoinOperator {} \
+                                do not match: {:d} x {:d} (GoldenStandard vs Template)".format(
+                                k+1, len(refIdList), len(idList) )
+                else:
+                    for w in range(0, len(idList)):
+                        schema = client.tableSchemaService.get(idList[k])
+                        refSchema = client.tableSchemaService.get(refIdList[k])
+                        
+                        res = compare_schema(client, w, schema, refSchema,  tol)
+                        tableRes = res[0]
+                        hasDiff = res[1]
 
-                    if hasDiff == True:
-                        tableRes["TableIdx"]:tableIdx+1
-                        stepResult = {**stepResult, **tableRes}
+                if hasDiff == True:
+                    tableRes["TableIdx"]:tableIdx+1
+                    stepResult = {**stepResult, **tableRes}
+                
+                k = k +1
+
     return stepResult
 
 def diff_workflow(client, workflow, refWorkflow,  tol=0, tolType="absolute", verbose=False):
@@ -294,14 +306,14 @@ def diff_workflow(client, workflow, refWorkflow,  tol=0, tolType="absolute", ver
                 if isinstance(stp.state.taskState, FailedState):
                     stepRes = {"Name":stp.name}
                     stepRes["TaskState"] = "Step did not run successfully"
-                    # resultDict = {**resultDict, **stepRes}
+                    
                     if len(stepRes) > 0:
                         resultDict.append(stepRes)
 
                 if isinstance(stp.state.taskState, InitState):
                     stepRes = {"Name":stp.name}
                     stepRes["TaskState"] = "Step did not run, likely due to a failed preceding step."
-                    # resultDict = {**resultDict, **stepRes}
+                    
                     if len(stepRes) > 0:
                         resultDict.append(stepRes)
 

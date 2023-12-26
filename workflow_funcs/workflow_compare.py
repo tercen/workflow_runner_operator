@@ -1,7 +1,7 @@
 import polars as pl
 import numpy as np
 
-import util
+import workflow_funcs.util as util
 
 
 from tercen.model.impl import *

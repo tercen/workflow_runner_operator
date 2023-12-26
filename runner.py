@@ -14,7 +14,9 @@ import string, random
 #from workflow_setup_client import setup_workflow 
 #from workflow_compare_client import diff_workflow
 
-import workflow_setup, workflow_compare, util
+import workflow_funcs.workflow_setup as workflow_setup, \
+    workflow_funcs.workflow_compare as workflow_compare, \
+        workflow_funcs.util as util
 
 #TODO Try workflow with documentId, readFCS
 from tercen.client.factory import TercenClient

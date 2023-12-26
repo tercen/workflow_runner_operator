@@ -1,7 +1,7 @@
 import copy
 from datetime import datetime
 
-import util
+import workflow_funcs.util as util
 
 
 from tercen.model.impl import *

@@ -7,12 +7,14 @@ import numpy as np
 
 import string, random
 
-sys.path.append("../")
-sys.path.append("./")
+#sys.path.append("../")
+#sys.path.append("./")
 
-from util import msg, filter_by_type
-from workflow_setup_client import setup_workflow 
-from workflow_compare_client import diff_workflow
+#from util import msg, filter_by_type
+#from workflow_setup_client import setup_workflow 
+#from workflow_compare_client import diff_workflow
+
+import workflow_setup, workflow_compare, util
 
 #TODO Try workflow with documentId, readFCS
 from tercen.client.factory import TercenClient
@@ -67,7 +69,7 @@ def parse_args(argv):
     params = {}
     opts, args = getopt.getopt(argv,"",
                                ["templateRepo=", "gitToken=", "tag=", "branch=",
-                                "update_operator=",
+                                "update_operator=", "quiet",
                                 "serviceUri=", "user=", "passw=", "authToken=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
@@ -77,7 +79,7 @@ def parse_args(argv):
 
     #docker run --net=host template_tester:0.0.1 --templateRepo=tercen/git_project_test  --gitToken=ddd serviceUri = 'http://127.0.0.1:5400'
     # FIXME DEBUG
-    templateRepo = None
+    templateRepo = None #"tercen/git_project_test" #None
    
 
     params["user"] = 'test'
@@ -132,8 +134,8 @@ def parse_args(argv):
         if opt == '--branch':
             params["branch"] = arg
 
-        if opt == '--verbose':
-            params["verbose"] = True
+        if opt == '--quiet':
+            params["verbose"] = False
 
         if opt == '--taskId':
             params["taskId"] = arg
@@ -198,7 +200,7 @@ def run(argv):
         importTask = client.taskService.waitDone(importTask.id)
         
         objs = client.persistentService.getDependentObjects(project.id)
-        workflowList = filter_by_type(objs, Workflow)
+        workflowList = util.filter_by_type(objs, Workflow)
 
 
         verbose = params["verbose"]
@@ -225,29 +227,31 @@ def run(argv):
                         gsWkf = w2
 
                         
-                        msg( "Testing template {} against {}.".format(wkfName, gsWkf.name ), verbose )
+                        util.msg( "Testing template {} against {}.".format(wkfName, gsWkf.name ), verbose )
                         
-                        workflowRun = setup_workflow(client, wkf, gsWkf=gsWkf, params=params)
+                        workflowRun = workflow_setup.setup_workflow(client, wkf, gsWkf=gsWkf, params=params)
                     
 
-                        msg("Running all steps", verbose)
+                        util.msg("Running all steps", verbose)
                         run_workflow(workflowRun, project, client)
-                        msg("Finished", verbose)
+                        util.msg("Finished", verbose)
 
                         # Retrieve the updated, ran workflow
                         workflowRun = client.workflowService.get(workflowRun.id)
 
 
-                        resultDict = diff_workflow(client, workflowRun, gsWkf,  params["tolerance"],
+                        resultDict = workflow_compare.diff_workflow(client, workflowRun, gsWkf,  params["tolerance"],
                                                 params["toleranceType"], verbose)
 
 
                         if len(resultDict) > 0:
                             resultList.append({w2.name: resultDict[0]})   
                             allPass = False
-                            msg("Workflow run was FAILED", verbose)
+                            util.msg("{} and {} comparison FAILED".format(\
+                                wkfName, gsWkf.name), verbose)
                         else:
-                            msg("Workflow run was SUCCESSFUL", verbose)
+                            util.msg("{} and {} comparison was SUCCESSFUL".format(\
+                                wkfName, gsWkf.name), verbose)
 
         if allPass == False:
             with open('test_results.json', 'w', encoding='utf-8') as f:
@@ -260,8 +264,8 @@ def run(argv):
             # Pass the failure to github action, so the GA workflow fails
             raise
 
-        msg("Workflow runner failed with error: ", True)
-        msg(e.with_traceback(), True)
+        util.msg("Workflow runner failed with error: ", True)
+        util.msg(e.with_traceback(), True)
 
         with open('test_results.json', 'w', encoding='utf-8') as f:
             json.dump({"Failure":e.with_traceback()}, f, ensure_ascii=False, indent=4)

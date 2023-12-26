@@ -1,7 +1,7 @@
 import polars as pl
 import numpy as np
 
-from util import msg, which
+import util
 
 
 from tercen.model.impl import *
@@ -117,7 +117,7 @@ def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="Absolute
         # Same number of columns and same number of rows
         # We can compare values column-wise
         for ci in range(0, len(colNames)):
-            msg("Comparing {} against {}".format(colNames[ci], refColNames[ci]), verbose=verbose)
+            util.msg("Comparing {} against {}".format(colNames[ci], refColNames[ci]), verbose=verbose)
             col = th.decodeTSON(client.tableSchemaService.selectStream(schema.id, [colNames[ci]], 0, -1))
             refCol = th.decodeTSON(client.tableSchemaService.selectStream(refSchema.id, [refColNames[ci]], 0, -1))
             colVals = col["columns"][0]["values"]
@@ -135,14 +135,14 @@ def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="Absolute
                     tableRes["ColType"].append( "Column tables do not match for Table {:d}, column {:d} : {} x {} (Reference vs Workflow)".format(
                         tableIdx + 1,
                         ci + 1,
-                        refColType,
+                        type(refColVals[0]),
                         type(colVals[0]) 
                     ))
                 else:
                     tableRes["ColType"] = ["Column tables do not match for Table {:d}, column {:d} : {} x {} (Reference vs Workflow)".format(
                         tableIdx + 1,
                         ci + 1,
-                        refColType,
+                        type(refColVals[0]),
                         type(colVals[0]) 
                     )]
 
@@ -182,7 +182,7 @@ def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="Absolute
                     "ColName":colNames[ci],
                     "RefValues":refColVals,
                     "Values":colVals,
-                    "OutOfRangeIdx":which(rel > tol),
+                    "OutOfRangeIdx":util.which(rel > tol),
                     "CompResult":rel
                 }
                 if hasattr(tableRes, "ColumnResults"):

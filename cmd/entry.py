@@ -1,4 +1,4 @@
-from template_tester import *
+from runner import *
 
 
 

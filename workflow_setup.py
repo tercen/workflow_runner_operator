@@ -1,7 +1,7 @@
 import copy
 from datetime import datetime
 
-from util import msg, which
+import util
 
 
 from tercen.model.impl import *
@@ -25,7 +25,7 @@ def get_installed_operator(client,  opName, opUrl, opVersion, params, verbose=Fa
     
     if not np.any(comp):
         # install the operator
-        msg("Installing {}:{} from {}".format(opName, opVersion, opUrl), verbose)
+        util.msg("Installing {}:{} from {}".format(opName, opVersion, opUrl), verbose)
         installTask = CreateGitOperatorTask()
         installTask.state = InitState()
         installTask.url.uri = opUrl
@@ -45,7 +45,7 @@ def get_installed_operator(client,  opName, opUrl, opVersion, params, verbose=Fa
         else:
             raise RuntimeError("Installation of operator " + opTag + " failed. USER: " + params["user"]) 
     else:
-        idx = which(comp)
+        idx = util.which(comp)
         if isinstance(idx, list):
             idx = idx[0]
 
@@ -64,7 +64,7 @@ def update_operators( workflow, client, params):
             opVersion = workflow.steps[stpIdx].model.operatorSettings.operatorRef.version
 
             # Might have multiple versions, get latest
-            opIdx = which([op.name == opName for op in operatorLib])
+            opIdx = util.which([op.name == opName for op in operatorLib])
 
             if opIdx != []:
                 if len(opIdx) > 1:
@@ -73,7 +73,7 @@ def update_operators( workflow, client, params):
 
                 libOp = operatorLib[opIdx]
                 if libOp.version > opVersion:
-                    msg("Updating {} operator from version {} to version {}".format(\
+                    util.msg("Updating {} operator from version {} to version {}".format(\
                         opName, libOp.version, opVersion), params["verbose"])
                     
                     operator = get_installed_operator(client,  \
@@ -90,7 +90,7 @@ def update_operators( workflow, client, params):
 
 def setup_workflow(client, templateWkf, gsWkf, params):
     # Copy is wanted in the case of multiple golden standards being tested
-    msg("Copying workflow", params["verbose"])
+    util.msg("Copying workflow", params["verbose"])
 
 
     workflow = copy.deepcopy(templateWkf)
@@ -98,7 +98,7 @@ def setup_workflow(client, templateWkf, gsWkf, params):
     workflow.id = ''
 
     if params["update_operator"] == True:
-        msg("Checking for updated operator versions", params["verbose"])
+        util.msg("Checking for updated operator versions", params["verbose"])
         workflow = update_operators( workflow, client, params)
     
 
@@ -132,7 +132,7 @@ def setup_workflow(client, templateWkf, gsWkf, params):
 
 # Separate function for legibility
 def update_table_relations(client, workflow, gsWorkflow, verbose=False):
-    msg("Setting up table step references in new workflow.", verbose)
+    util.msg("Setting up table step references in new workflow.", verbose)
 
     for gsStp in gsWorkflow.steps:
         if isinstance(gsStp, TableStep):
@@ -148,7 +148,7 @@ def update_table_relations(client, workflow, gsWorkflow, verbose=False):
                     
 
 def update_wizard_factors(client, workflow, gsWorkflow, verbose=False):
-    msg("Updating Wizard factors.", verbose)
+    util.msg("Updating Wizard factors.", verbose)
 
     for gsStp in gsWorkflow.steps:
         if isinstance(gsStp, WizardStep):

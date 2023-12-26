@@ -254,11 +254,22 @@ def run(argv):
                         else:
                             util.msg("{} and {} comparison was SUCCESSFUL".format(\
                                 wkfName, gsWkf.name), verbose)
+        
+        gaEnvfile = os.getenv('GITHUB_ENV')
+        
 
         if allPass == False:
             with open('test_results.json', 'w', encoding='utf-8') as f:
                 json.dump(resultList, f, ensure_ascii=False, indent=4)     
-            raise WorkflowComparisonError
+
+            if gaEnvfile != None:
+                with open(gaEnvfile, "a") as gaFile:
+                    gaFile.write(f"SUCCESS=FALSE")
+        else:
+            if gaEnvfile != None:
+                with open(gaEnvfile, "a") as gaFile:
+                    gaFile.write(f"SUCCESS=TRUE")
+            #raise WorkflowComparisonError
 
     except Exception as e:
         if type(e) == WorkflowComparisonError:

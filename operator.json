@@ -1,7 +1,7 @@
 {
     "name": "Template Tester",
     "description": "Operator used to test templates against golden standards",
-    "tags": ["template", "test"],
+    "tags": ["test"],
     "authors": ["tercen"],
     "urls": ["https://github.com/tercen/workflow_runner"],
     "container":"tercen/template_tester:latest",

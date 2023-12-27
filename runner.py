@@ -2,77 +2,27 @@ import os
 import sys, getopt
 import json
 import polars as pl
-import numpy as np
 
 
 import string, random
-
-#sys.path.append("../")
-#sys.path.append("./")
-
-#from util import msg, filter_by_type
-#from workflow_setup_client import setup_workflow 
-#from workflow_compare_client import diff_workflow
 
 import workflow_funcs.workflow_setup as workflow_setup, \
     workflow_funcs.workflow_compare as workflow_compare, \
         workflow_funcs.util as util
 
-#TODO Try workflow with documentId, readFCS
+
 from tercen.client.factory import TercenClient
 
-from tercen.model.impl import RunWorkflowTask, InitState,  Workflow, Project, GitProjectTask, Schema
+from tercen.model.impl import InitState,  Workflow, Project, GitProjectTask
+from tercen.client import context as ctx
 
-class WorkflowComparisonError(Exception):
-    pass
-
-def numpy_to_list(obj):
-    if isinstance(obj, np.ndarray):
-        obj = obj.tolist()
-
-        for i in range(0, len(obj)):
-            obj[i] = numpy_to_list(obj[i])
-
-        return obj
-    elif isinstance(obj, list):
-        for i in range(0, len(obj)):
-            obj[i] = numpy_to_list(obj[i])
-
-        return obj
-    elif isinstance(obj, dict):
-        for key in obj:
-            obj[key] = numpy_to_list(obj[key])
-        
-        return obj
-    elif isinstance(obj, pl.Series):
-        obj = obj.to_list()
-
-        for i in range(0, len(obj)):
-            obj[i] = numpy_to_list(obj[i])
-
-        return obj
-    else:
-        return obj
-
-def run_workflow(workflow, project, client):
-    # RUN the CLONED workflow 
-    runTask = RunWorkflowTask()
-    runTask.state = InitState()
-    runTask.workflowId = workflow.id
-    runTask.workflowRev = workflow.rev
-    runTask.owner = project.acl.owner
-    runTask.projectId = project.id
-
-    runTask = client.taskService.create(obj=runTask)
-    client.taskService.runTask(taskId=runTask.id)
-    runTask = client.taskService.waitDone(taskId=runTask.id)
 
 def parse_args(argv):
     params = {}
     opts, args = getopt.getopt(argv,"",
                                ["templateRepo=", "gitToken=", "tag=", "branch=",
                                 "update_operator=", "quiet",
-                                "serviceUri=", "user=", "passw=", "authToken=",
+                                "serviceUri=", "user=", "passw=", "token=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
 
@@ -81,12 +31,12 @@ def parse_args(argv):
 
     #docker run --net=host template_tester:0.0.1 --templateRepo=tercen/git_project_test  --gitToken=ddd serviceUri = 'http://127.0.0.1:5400'
     # FIXME DEBUG
-    templateRepo = None #"tercen/git_project_test" #None
+    templateRepo = "" #"tercen/git_project_test" #None
    
 
     params["user"] = 'test'
     params["passw"] = 'test'
-    params["authToken"] = ''
+    params["token"] = ''
     gitToken = None
     params["verbose"] = True
     params["tag"] = ''
@@ -121,8 +71,8 @@ def parse_args(argv):
         if opt == '--passw':
             params["passw"] = arg
         
-        if opt == '--authToken':
-            params["authToken"] = arg
+        if opt == '--token':
+            params["token"] = arg
 
         if opt == '--tolerance':
             params["tolerance"] = float(arg)
@@ -164,16 +114,9 @@ def parse_args(argv):
     return params
 
 
-def run(argv):
-    params = parse_args(argv)
-    client = params["client"]
-    
-    
-    if params["taskId"] != None:
-        # TODO Run as operator
-        pass
-    
+def run_with_params(params):
     try:
+        client = params["client"]
         # Create temp project to run tests
         project = Project()
         project.name = 'template_test_' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
@@ -235,7 +178,7 @@ def run(argv):
                     
 
                         util.msg("Running all steps", verbose)
-                        run_workflow(workflowRun, project, client)
+                        util.run_workflow(workflowRun, project, client)
                         util.msg("Finished", verbose)
 
                         # Retrieve the updated, ran workflow
@@ -269,14 +212,8 @@ def run(argv):
             if gaEnvfile != None:
                 with open(gaEnvfile, "a") as gaFile:
                     gaFile.write(f"SUCCESS=TRUE")
-            #raise WorkflowComparisonError
 
     except Exception as e:
-        if type(e) == WorkflowComparisonError:
-            # Runner executed succesfully, but workflow comparison failed
-            # Pass the failure to github action, so the GA workflow fails
-            raise
-
         util.msg("Workflow runner failed with error: ", True)
         util.msg(e.with_traceback(), True)
 
@@ -286,6 +223,37 @@ def run(argv):
     finally:
         if project != None and client != None:
             client.workflowService.delete(project.id, project.rev)
+
+def run(argv):
+    params = parse_args(argv)
+    #http://127.0.0.1:5400/test/w/ac44dd4f14f28b0884cf7c9d600027f1/ds/1ba15e7c-6c3e-4521-81f2-d19fa58a57b9
+    # params["taskId"] = "someId"
+    
+    if params["taskId"] != None:
+        # TODO Run as operator
+        # tercenCtx = ctx.TercenContext(workflowId="ac44dd4f14f28b0884cf7c9d600027f1",\
+        #                                stepId="1ba15e7c-6c3e-4521-81f2-d19fa58a57b9")
+        tercenCtx = ctx.TercenContext()
+        params["client"] = tercenCtx.context.client
+  
+        df = tercenCtx.rselect()
+        
+        repoFacName = tercenCtx.rnames
+
+
+        templateRepo = "https://github.com/" + df[0].to_series()[0]
+        params["templateRepo"] = templateRepo
+
+        outDf = pl.DataFrame({".ci": [0, 0, 0],\
+                               "git_repo": [df[0].to_series()[0], df[0].to_series()[0], df[0].to_series()[0]],\
+                              "workflow": ["Simple", "Simple2", "WizardWkf"],\
+                              "status": [1,1,0]})
+        outDf = outDf.with_columns(pl.col('.ci').cast(pl.Int32))
+        tercenCtx.save(outDf)
+    else:
+        run_with_params(params)
+    
+
 
 
 

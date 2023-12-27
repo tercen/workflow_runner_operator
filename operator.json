@@ -5,12 +5,5 @@
     "authors": ["tercen"],
     "urls": ["https://github.com/tercen/workflow_runner"],
     "container":"tercen/template_tester:latest",
-    "properties": [
-        {
-            "kind": "StringProperty",
-            "name": "taskId",
-            "defaultValue": "",
-            "description": ""
-        }
-     ]
+    "properties": []        
 }

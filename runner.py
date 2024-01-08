@@ -21,7 +21,7 @@ def parse_args(argv):
     params = {}
     opts, args = getopt.getopt(argv,"",
                                ["templateRepo=", "gitToken=", "tag=", "branch=",
-                                "update_operator=", "quiet",
+                                "update_operator", "quiet", "report",
                                 "serviceUri=", "user=", "passw=", "token=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
@@ -31,7 +31,7 @@ def parse_args(argv):
 
     #docker run --net=host template_tester:0.0.1 --templateRepo=tercen/git_project_test  --gitToken=ddd serviceUri = 'http://127.0.0.1:5400'
     # FIXME DEBUG
-    templateRepo = "" #"tercen/git_project_test" #None
+    templateRepo = "tercen/git_project_test" #None
    
 
     params["user"] = 'test'
@@ -43,6 +43,7 @@ def parse_args(argv):
     params["branch"] = 'main'
 
     params["update_operator"] = False
+    params["report"] = False
     
     params["tolerance"] = 0.001
     params["toleranceType"] = "relative"
@@ -92,14 +93,13 @@ def parse_args(argv):
         if opt == '--taskId':
             params["taskId"] = arg
 
-        if opt == params["update_operator"]:
-            params["update_operator"] = arg
+        if opt == '--update_operator':
+            params["update_operator"] = True
+            
 
+        if opt == '--report':
+            params["report"] = True
     
-    client = TercenClient(params["serviceUri"])
-    client.userService.connect(params["user"], params["passw"])
-
-    params["client"] = client
    
     templateRepo = "https://github.com/" + templateRepo
 
@@ -116,7 +116,11 @@ def parse_args(argv):
 
 def run_with_params(params):
     try:
-        client = params["client"]
+        client = TercenClient(params["serviceUri"])
+        client.userService.connect(params["user"], params["passw"])
+
+
+        # client = params["client"]
         # Create temp project to run tests
         project = Project()
         project.name = 'template_test_' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
@@ -190,35 +194,26 @@ def run_with_params(params):
 
 
                         if len(resultDict) > 0:
-                            resultList.append({w2.name: resultDict[0]})   
-                            allPass = False
-                            util.msg("{} and {} comparison FAILED".format(\
-                                wkfName, gsWkf.name), verbose)
+                            if params["report"] == True:
+                                resultList.append({w2.name: resultDict[0]})   
+                                util.msg("{} and {} comparison FAILED".format(\
+                                    wkfName, gsWkf.name), verbose)
+                            else:
+                                raise Exception("Comparison between {} and {} failed.".format(\
+                                    wkfName, gsWkf.name))
+                            
                         else:
                             util.msg("{} and {} comparison was SUCCESSFUL".format(\
                                 wkfName, gsWkf.name), verbose)
-        
-        gaEnvfile = os.getenv('GITHUB_ENV')
-        
-
-        if allPass == False:
-            with open('test_results.json', 'w', encoding='utf-8') as f:
-                json.dump(resultList, f, ensure_ascii=False, indent=4)     
-
-            if gaEnvfile != None:
-                with open(gaEnvfile, "a") as gaFile:
-                    gaFile.write(f"SUCCESS=FALSE")
-        else:
-            if gaEnvfile != None:
-                with open(gaEnvfile, "a") as gaFile:
-                    gaFile.write(f"SUCCESS=TRUE")
-
     except Exception as e:
         util.msg("Workflow runner failed with error: ", True)
         util.msg(e.with_traceback(), True)
 
-        with open('test_results.json', 'w', encoding='utf-8') as f:
-            json.dump({"Failure":e.with_traceback()}, f, ensure_ascii=False, indent=4)
+        if resultList != None and len(resultList) > 0:
+            with open('test_results.json', 'w', encoding='utf-8') as f:
+                json.dump({"Failure":e.with_traceback()}, f, ensure_ascii=False, indent=4)
+        
+        raise e
         
     finally:
         if project != None and client != None:

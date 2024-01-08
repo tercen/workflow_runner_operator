@@ -108,13 +108,13 @@ def setup_workflow(client, templateWkf, gsWkf, params):
     for stp in workflow.steps:
         if hasattr(stp, "computedRelation"):
             #TODO Check if this factor actually exists
-            # Operators (like downsample) might not have it
+            # Operators (like downsize) might not have it
             # NOTE Adding a filter to avoid caches will break wizard steps
             # Some new strategy here is needed
-            stp.model.axis.xyAxis[0].yAxis.axisExtent.y = \
-                stp.model.axis.xyAxis[0].yAxis.axisExtent.y+0.1           
+            # TODO Add an arbitrary, random env pair to the Step
+            stp.model.operatorSettings.environment.append(Pair({"key":"Cache", "value":"Disable"}))
 
-        
+       
         stp.state.taskState = InitState()
 
     
@@ -134,31 +134,22 @@ def setup_workflow(client, templateWkf, gsWkf, params):
 def update_table_relations(client, workflow, gsWorkflow, verbose=False):
     util.msg("Setting up table step references in new workflow.", verbose)
 
-    for gsStp in gsWorkflow.steps:
-        if isinstance(gsStp, TableStep):
-            # Number of steps might have changed
-            for i in range(0, len(workflow.steps)):
-                stp = workflow.steps[i]
-                # NOTE Assumes the golden standard was a clone of an execution of the template
-                # This assumption MIGHT NOT hold
-                if stp.id == gsStp.id:
-                    stp.model = copy.deepcopy(gsStp.model)
-                    stp.state.taskState = DoneState()
-                    stp.name = gsStp.name
+    for gsStp in util.filter_by_type(gsWorkflow.steps, TableStep):
+        for stp in util.filter_by_type(workflow.steps, TableStep): #range(0, len(workflow.steps)):
+            if stp.id == gsStp.id:
+                stp.model = copy.deepcopy(gsStp.model)
+                stp.state.taskState = DoneState()
+                stp.name = gsStp.name
                     
 
 def update_wizard_factors(client, workflow, gsWorkflow, verbose=False):
     util.msg("Updating Wizard factors.", verbose)
 
-    for gsStp in gsWorkflow.steps:
-        if isinstance(gsStp, WizardStep):
-            # Number of steps might have changed
-            for i in range(0, len(workflow.steps)):
-                stp = workflow.steps[i]
-                # NOTE Assumes the golden standard was a clone of an execution of the template
-                # This assumption MIGHT NOT hold
-                if stp.id == gsStp.id:
-                    stp.model = copy.deepcopy(gsStp.model)
+    for gsStp in util.filter_by_type(gsWorkflow.steps, WizardStep):
+        for stp in util.filter_by_type(workflow.steps, WizardStep): #range(0, len(workflow.steps)):
+            if stp.id == gsStp.id:
+                stp.model = copy.deepcopy(gsStp.model)
+
                     
 
 

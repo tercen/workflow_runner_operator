@@ -31,7 +31,7 @@ def parse_args(argv):
 
     #docker run --net=host template_tester:0.0.1 --templateRepo=tercen/git_project_test  --gitToken=ddd serviceUri = 'http://127.0.0.1:5400'
     # FIXME DEBUG
-    templateRepo = "tercen/git_project_test" #None
+    templateRepo = "" #"tercen/git_project_test" #None
    
 
     params["user"] = 'test'

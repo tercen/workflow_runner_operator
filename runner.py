@@ -29,7 +29,7 @@ def parse_args(argv):
     
     
 
-    #docker run -t --net=host tercen/workflow_runner:latest --templateRepo=tercen/git_project_test  --gitToken=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 serviceUri=http://127.0.0.1:5400 --opMem="500000000"
+    #docker run -t --net=host tercen/workflow_runner:latest --templateRepo=tercen/git_project_test  --gitToken=ddd serviceUri=http://127.0.0.1:5400 --opMem="500000000"
     # FIXME DEBUG
     templateRepo = "" #"tercen/git_project_test" 
 

@@ -21,7 +21,7 @@ def parse_args(argv):
     params = {}
     opts, args = getopt.getopt(argv,"",
                                ["templateRepo=", "gitToken=", "tag=", "branch=",
-                                "update_operator", "quiet", "report",
+                                "update_operator", "quiet", "report", "opMem=",
                                 "serviceUri=", "user=", "passw=", "token=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
@@ -29,10 +29,13 @@ def parse_args(argv):
     
     
 
-    #docker run --net=host template_tester:0.0.1 --templateRepo=tercen/git_project_test  --gitToken=ddd serviceUri = 'http://127.0.0.1:5400'
+    #docker run -t --net=host tercen/workflow_runner:latest --templateRepo=tercen/git_project_test  --gitToken=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 serviceUri=http://127.0.0.1:5400 --opMem="500000000"
     # FIXME DEBUG
-    templateRepo = "" #"tercen/git_project_test" #None
-   
+    templateRepo = "" #"tercen/git_project_test" 
+
+    # If running locally or creating new operator, memory might no be set
+    # This parameter sets the memory for ALL operators
+    params["opMem"] = None #"500000000" #None
 
     params["user"] = 'test'
     params["passw"] = 'test'
@@ -65,6 +68,9 @@ def parse_args(argv):
 
         if opt == '--serviceUri':
             params["serviceUri"] = arg
+
+        if opt == '--opMem':
+            params["opMem"] = arg
 
         if opt == '--user':
             params["user"] = arg
@@ -163,7 +169,7 @@ def run_with_params(params):
             # FIXME DEBUG
             #if not wkfName.startswith("Complex"):
             # if wkfName != "WizardWkf":
-            #     continue
+            #    continue
                 
             
             nameParts = wkfName.split("_")
@@ -207,11 +213,11 @@ def run_with_params(params):
                                 wkfName, gsWkf.name), verbose)
     except Exception as e:
         util.msg("Workflow runner failed with error: ", True)
-        util.msg(e.with_traceback(), True)
+        util.msg(e.__traceback__, True)
 
         if resultList != None and len(resultList) > 0:
             with open('test_results.json', 'w', encoding='utf-8') as f:
-                json.dump({"Failure":e.with_traceback()}, f, ensure_ascii=False, indent=4)
+                json.dump({"Failure":e.__traceback__}, f, ensure_ascii=False, indent=4)
         
         raise e
         

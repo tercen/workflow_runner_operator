@@ -234,9 +234,9 @@ def run_with_params(params, mode="cli"):
         util.msg("Workflow runner failed with error: ", True)
         util.msg(traceback.format_exc(), True)
 
-        if resultList == None or len(resultList) == 0:
-            with open('test_results.json', 'w', encoding='utf-8') as f:
-                json.dump({"Traceback":traceback.format_exc()}, f, ensure_ascii=False, indent=4)
+#        if resultList == None or len(resultList) == 0:
+#            with open('test_results.json', 'w', encoding='utf-8') as f:
+#                json.dump({"Traceback":traceback.format_exc()}, f, ensure_ascii=False, indent=4)
         
         raise e
         

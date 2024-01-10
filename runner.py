@@ -215,7 +215,7 @@ def run_with_params(params, mode="cli"):
                                     "status":0})
                             else:
                                 with open('test_results.json', 'w', encoding='utf-8') as f:
-                                    json.dump(resultList, f, ensure_ascii=False, indent=4)
+                                    json.dump(resultDict, f, ensure_ascii=False, indent=4)
 
                                 raise Exception("Comparison between {} and {} failed.".format(\
                                     wkfName, gsWkf.name))

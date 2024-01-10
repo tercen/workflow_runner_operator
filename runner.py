@@ -54,6 +54,7 @@ def parse_args(argv):
     params["taskId"] = None
 
     params["serviceUri"] = "http://127.0.0.1:5400"
+    params["client"] = None
 
     for opt, arg in opts:
         if opt == '-h':
@@ -120,11 +121,14 @@ def parse_args(argv):
     return params
 
 
-def run_with_params(params):
+def run_with_params(params, mode="cli"):
+    resultList = []
     try:
-        client = TercenClient(params["serviceUri"])
-        client.userService.connect(params["user"], params["passw"])
-
+        if params["client"] == None:
+            client = TercenClient(params["serviceUri"])
+            client.userService.connect(params["user"], params["passw"])
+        else:
+            client = params["client"] # Running as operator
 
         # client = params["client"]
         # Create temp project to run tests
@@ -159,9 +163,9 @@ def run_with_params(params):
 
 
         verbose = params["verbose"]
-        resultList = []
-
-        allPass = True
+        
+        statusList=[]
+        
         for w in workflowList:
             
             wkfName = w.name
@@ -204,18 +208,29 @@ def run_with_params(params):
                                 resultList.append({w2.name: resultDict[0]})   
                                 util.msg("{} and {} comparison FAILED".format(\
                                     wkfName, gsWkf.name), verbose)
+                                statusList.append({\
+                                    "workflow":wkfName,\
+                                    "goldenStandard":gsWkf.name,\
+                                    "status":0})
                             else:
+                                with open('test_results.json', 'w', encoding='utf-8') as f:
+                                    json.dump(resultList, f, ensure_ascii=False, indent=4)
+                                    
                                 raise Exception("Comparison between {} and {} failed.".format(\
                                     wkfName, gsWkf.name))
                             
                         else:
                             util.msg("{} and {} comparison was SUCCESSFUL".format(\
                                 wkfName, gsWkf.name), verbose)
+                            statusList.append({\
+                                    "workflow":wkfName,\
+                                    "goldenStandard":gsWkf.name,\
+                                    "status":1})
     except Exception as e:
         util.msg("Workflow runner failed with error: ", True)
         util.msg(e.__traceback__, True)
 
-        if resultList != None and len(resultList) > 0:
+        if resultList == None or len(resultList) == 0:
             with open('test_results.json', 'w', encoding='utf-8') as f:
                 json.dump({"Failure":e.__traceback__}, f, ensure_ascii=False, indent=4)
         
@@ -225,30 +240,51 @@ def run_with_params(params):
         if project != None and client != None:
             client.workflowService.delete(project.id, project.rev)
 
+    if mode == "operator":
+        return statusList
+
+
 def run(argv):
     params = parse_args(argv)
     #http://127.0.0.1:5400/test/w/ac44dd4f14f28b0884cf7c9d600027f1/ds/1ba15e7c-6c3e-4521-81f2-d19fa58a57b9
-    # params["taskId"] = "someId"
+    params["taskId"] = "someId"
     
     if params["taskId"] != None:
         # TODO Run as operator
-        # tercenCtx = ctx.TercenContext(workflowId="ac44dd4f14f28b0884cf7c9d600027f1",\
-        #                                stepId="1ba15e7c-6c3e-4521-81f2-d19fa58a57b9")
-        tercenCtx = ctx.TercenContext()
+        tercenCtx = ctx.TercenContext(workflowId="ac44dd4f14f28b0884cf7c9d600027f1",\
+                                       stepId="1ba15e7c-6c3e-4521-81f2-d19fa58a57b9")
+        # tercenCtx = ctx.TercenContext()
         params["client"] = tercenCtx.context.client
   
-        df = tercenCtx.rselect()
+        df = tercenCtx.cselect()
         
-        repoFacName = tercenCtx.rnames
+        repoFacName = tercenCtx.cnames
 
+        nRepos = df.shape[0]
+        outDf = None
+        for i in range(0, nRepos):
 
-        templateRepo = "https://github.com/" + df[0].to_series()[0]
-        params["templateRepo"] = templateRepo
+            templateRepo = "https://github.com/" + df[i,0]
+            params["templateRepo"] = templateRepo
+            params["branch"] = df[i,1]
+            params["tag"] = df[i,2]
+            params["gitToken"] = os.getenv("GITHUB_TOKEN")
+            params["report"] = True
+            params["opMem"] = "500000000"
 
-        outDf = pl.DataFrame({".ci": [0, 0, 0],\
-                               "git_repo": [df[0].to_series()[0], df[0].to_series()[0], df[0].to_series()[0]],\
-                              "workflow": ["Simple", "Simple2", "WizardWkf"],\
-                              "status": [1,1,0]})
+            statusList = run_with_params(params, mode="operator")
+
+            for st in statusList:
+                if outDf == None:
+                    outDf = pl.DataFrame({".ci": i,\
+                                        "workflow": st.workflow,\
+                                        "golden_standard": st.goldenStandard,\
+                                        "status": st.status})
+                else:
+                    outDf = pl.DataFrame({".ci": i,\
+                                        "workflow": st.workflow,\
+                                        "golden_standard": st.goldenStandard,\
+                                        "status": st.status})
         outDf = outDf.with_columns(pl.col('.ci').cast(pl.Int32))
         tercenCtx.save(outDf)
     else:

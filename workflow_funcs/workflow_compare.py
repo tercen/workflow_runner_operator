@@ -306,6 +306,8 @@ def diff_workflow(client, workflow, refWorkflow,  tol=0, tolType="absolute", ver
                 if isinstance(stp.state.taskState, FailedState):
                     stepRes = {"Name":stp.name}
                     stepRes["TaskState"] = "Step did not run successfully"
+                    stepRes["FailCode"] = stp.state.taskState.error
+                    stepRes["FailReason"] = stp.state.taskState.reason
                     
                     if len(stepRes) > 0:
                         resultDict.append(stepRes)

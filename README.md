@@ -86,7 +86,7 @@ The workflow runner is contained within a docker and can be called like the exam
 | passw | test | Tercen password |
 | token | - | Authorization token to be used instead of password |
 | gitToken | - | Authorization token to be used when connecting to github  |
-| serviceUri | http://127.0.0.1:5400 | Tercen URI where the runner will execute the tests |
+| serviceUri | ht<span>tp://127.0.0.1:5400</span> | Tercen URI where the runner will execute the tests |
 
 
 

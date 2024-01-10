@@ -227,6 +227,9 @@ def run_with_params(params, mode="cli"):
                                     "workflow":wkfName,\
                                     "goldenStandard":gsWkf.name,\
                                     "status":1})
+                            
+        with open('test_results.json', 'w', encoding='utf-8') as f:
+                json.dump({"Status":"Success"}, f, ensure_ascii=False, indent=4)
     except Exception as e:
         util.msg("Workflow runner failed with error: ", True)
         util.msg(traceback.format_exc(), True)

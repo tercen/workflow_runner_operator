@@ -4,7 +4,8 @@ import json
 import polars as pl
 
 
-import string, random
+
+import string, random, traceback
 
 import workflow_funcs.workflow_setup as workflow_setup, \
     workflow_funcs.workflow_compare as workflow_compare, \
@@ -228,11 +229,11 @@ def run_with_params(params, mode="cli"):
                                     "status":1})
     except Exception as e:
         util.msg("Workflow runner failed with error: ", True)
-        util.msg(e.__traceback__, True)
+        util.msg(traceback.format_exc(), True)
 
         if resultList == None or len(resultList) == 0:
             with open('test_results.json', 'w', encoding='utf-8') as f:
-                json.dump({"Failure":e.__traceback__}, f, ensure_ascii=False, indent=4)
+                json.dump({"Traceback":traceback.format_exc()}, f, ensure_ascii=False, indent=4)
         
         raise e
         

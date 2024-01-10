@@ -204,7 +204,7 @@ def run_with_params(params, mode="cli"):
                                                 params["toleranceType"], verbose)
 
 
-                        if len(resultDict) > 0:
+                        if resultDict != None and resultDict != []:
                             if params["report"] == True:
                                 resultList.append({w2.name: resultDict[0]})   
                                 util.msg("{} and {} comparison FAILED".format(\

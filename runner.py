@@ -215,7 +215,7 @@ def run_with_params(params, mode="cli"):
                             else:
                                 with open('test_results.json', 'w', encoding='utf-8') as f:
                                     json.dump(resultList, f, ensure_ascii=False, indent=4)
-                                    
+
                                 raise Exception("Comparison between {} and {} failed.".format(\
                                     wkfName, gsWkf.name))
                             
@@ -247,7 +247,7 @@ def run_with_params(params, mode="cli"):
 def run(argv):
     params = parse_args(argv)
     #http://127.0.0.1:5400/test/w/ac44dd4f14f28b0884cf7c9d600027f1/ds/1ba15e7c-6c3e-4521-81f2-d19fa58a57b9
-    params["taskId"] = "someId"
+    # params["taskId"] = "someId"
     
     if params["taskId"] != None:
         # TODO Run as operator

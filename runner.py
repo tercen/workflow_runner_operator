@@ -1,16 +1,14 @@
-import os 
-import sys, getopt
-import json
+import string, random, traceback, hashlib,\
+        json, sys, getopt, os, zlib, base64
+
 import polars as pl
 
-
-
-import string, random, traceback
 
 import workflow_funcs.workflow_setup as workflow_setup, \
     workflow_funcs.workflow_compare as workflow_compare, \
         workflow_funcs.util as util
 
+import tercen.util.helper_functions as tercenUtil
 
 from tercen.client.factory import TercenClient
 
@@ -194,12 +192,12 @@ def run_with_params(params, mode="cli"):
 
                         util.msg("Running all steps", verbose)
                         util.run_workflow(workflowRun, project, client)
-                        util.msg("Finished", verbose)
+                        util.msg("Done", verbose)
 
                         # Retrieve the updated, ran workflow
                         workflowRun = client.workflowService.get(workflowRun.id)
 
-
+                        util.msg("Comparing Results", verbose)
                         resultDict = workflow_compare.diff_workflow(client, workflowRun, gsWkf,  params["tolerance"],
                                                 params["toleranceType"], verbose)
 
@@ -212,7 +210,8 @@ def run_with_params(params, mode="cli"):
                                 statusList.append({\
                                     "workflow":wkfName,\
                                     "goldenStandard":gsWkf.name,\
-                                    "status":0})
+                                    "status":0,
+                                    "result":resultDict})
                             else:
                                 with open('test_results.json', 'w', encoding='utf-8') as f:
                                     json.dump(resultDict, f, ensure_ascii=False, indent=4)
@@ -226,7 +225,11 @@ def run_with_params(params, mode="cli"):
                             statusList.append({\
                                     "workflow":wkfName,\
                                     "goldenStandard":gsWkf.name,\
-                                    "status":1})
+                                    "status":1,
+                                    "result":{}})
+                    
+                        util.msg("Finished Run", verbose)
+                            
                             
         with open('test_results.json', 'w', encoding='utf-8') as f:
                 json.dump({"Status":"Success"}, f, ensure_ascii=False, indent=4)
@@ -255,42 +258,88 @@ def run(argv):
     
     if params["taskId"] != None:
         # TODO Run as operator
-        tercenCtx = ctx.TercenContext(workflowId="ac44dd4f14f28b0884cf7c9d600027f1",\
-                                       stepId="1ba15e7c-6c3e-4521-81f2-d19fa58a57b9")
-        # tercenCtx = ctx.TercenContext()
+        # tercenCtx = ctx.TercenContext(workflowId="ac44dd4f14f28b0884cf7c9d600027f1",\
+                                    #   stepId="1ba15e7c-6c3e-4521-81f2-d19fa58a57b9")
+        tercenCtx = ctx.TercenContext()
         params["client"] = tercenCtx.context.client
   
+
+        opMem = tercenCtx.operator_property('Memory', typeFn=int, default=-1)
+        gitToken = tercenCtx.operator_property('Github Token', typeFn=str, default="")
+        tolerance = tercenCtx.operator_property('Tolerance', typeFn=float, default=0.001)
+        toleranceType = tercenCtx.operator_property('Tolerance Type', typeFn=str, default="relative")
+
+
+        if gitToken == "":
+            gitToken = os.getenv("GITHUB_TOKEN")
+        
+        
         df = tercenCtx.cselect()
         
         repoFacName = tercenCtx.cnames
 
         nRepos = df.shape[0]
-        outDf = None
+        outDf = pl.DataFrame()
+        outDf2 = pl.DataFrame()
         for i in range(0, nRepos):
 
             templateRepo = "https://github.com/" + df[i,0]
             params["templateRepo"] = templateRepo
             params["branch"] = df[i,1]
             params["tag"] = df[i,2]
-            params["gitToken"] = os.getenv("GITHUB_TOKEN")
+            params["gitToken"] = gitToken
             params["report"] = True
-            params["opMem"] = "500000000"
+            params["tolerance"] = tolerance
+            params["toleranceType"] = toleranceType
+
+            if opMem > 0:
+                params["opMem"] = str(opMem)
 
             statusList = run_with_params(params, mode="operator")
-
+            
             for st in statusList:
-                if outDf == None:
+
+                
+
+                output_str = []
+                outBytes = zlib.compress(json.dumps(st["result"]).encode("utf-8"))
+                output_str.append(base64.b64encode(outBytes))
+                
+                checksum = hashlib.md5(outBytes).hexdigest()
+                if outDf.is_empty():
                     outDf = pl.DataFrame({".ci": i,\
-                                        "workflow": st.workflow,\
-                                        "golden_standard": st.goldenStandard,\
-                                        "status": st.status})
+                                        "workflow": st["workflow"],\
+                                        "golden_standard": st["goldenStandard"],\
+                                        "status": st["status"]})
+                    
+                    outDf2 = pl.DataFrame({".ci": i,\
+                                           "checksum":checksum,\
+                                           "mimetype":"application/json",\
+                                           ".content":output_str})
+                    
                 else:
-                    outDf = pl.DataFrame({".ci": i,\
-                                        "workflow": st.workflow,\
-                                        "golden_standard": st.goldenStandard,\
-                                        "status": st.status})
-        outDf = outDf.with_columns(pl.col('.ci').cast(pl.Int32))
-        tercenCtx.save(outDf)
+                    outDf =  pl.concat([outDf,\
+                                         pl.DataFrame({".ci": i,\
+                                        "workflow": st["workflow"],\
+                                        "golden_standard": st["goldenStandard"],\
+                                        "status": st["status"]})\
+                                        ])
+                    
+                    outDf2 = pl.concat([outDf2,\
+                                        pl.DataFrame({".ci": i,\
+                                                    "checksum":checksum,\
+                                                    "mimetype":"application/json",\
+                                                    ".content":output_str})\
+                                        ])
+                    
+        outDf = outDf.with_columns(pl.col('.ci').cast(pl.Int32))\
+                     .with_columns(pl.col('status').cast(pl.Float64))
+        outDf2 = outDf2.with_columns(pl.col('.ci').cast(pl.Int32))\
+                       .with_columns(pl.col('.content').cast(pl.Utf8))
+
+        outDf = tercenCtx.add_namespace(outDf) 
+        outDf2 = tercenCtx.add_namespace(outDf2) 
+        tercenCtx.save([outDf, outDf2])
     else:
         run_with_params(params)
     

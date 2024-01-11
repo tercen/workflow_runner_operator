@@ -5,5 +5,34 @@
     "authors": ["tercen"],
     "urls": ["https://github.com/tercen/workflow_runner"],
     "container":"tercen/workflow_runner:latest",
-    "properties": []        
+    "properties": [
+        {
+            "kind": "DoubleProperty",
+            "name": "Memory",
+            "defaultValue": -1,
+            "description": "Custom RAM allocated to all opertors in all workflows."
+        },
+        {
+            "kind": "StringProperty",
+            "name": "Github Token",
+            "defaultValue": "",
+            "description": "Personal Github Access Token."
+        },
+        {
+            "kind": "DoubleProperty",
+            "name": "Tolerance",
+            "defaultValue": 0.001,
+            "description": "Acceptable difference between resulting column values."
+        },
+        {
+            "kind": "EnumeratedProperty",
+            "name": "Tolerance",
+            "defaultValue": "Relative",
+            "values": [
+              "Relative",
+              "Absolute"
+            ],
+            "description": "Type of tolerance used to compare numerical values."
+        }
+    ] 
 }

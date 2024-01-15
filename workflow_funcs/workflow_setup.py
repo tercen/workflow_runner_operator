@@ -111,6 +111,8 @@ def setup_workflow(client, templateWkf, gsWkf, params):
             # Operators (like downsize) might not have it
             # NOTE Adding a filter to avoid caches will break wizard steps
             # Some new strategy here is needed
+            #stp.model.axis.xyAxis[0].yAxis.axisExtent.y = \
+            #    stp.model.axis.xyAxis[0].yAxis.axisExtent.y+0.1  
             stp.model.operatorSettings.environment.append(Pair({"key":"Cache", "value":"Disable"}))
             if params["opMem"] != None:
                 for p in stp.model.operatorSettings.environment:

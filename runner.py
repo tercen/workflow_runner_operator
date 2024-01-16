@@ -1,5 +1,5 @@
 import string, random, traceback, hashlib,\
-        json, sys, getopt, os, zlib, base64
+        json, sys, getopt, os,  base64
 
 import polars as pl
 
@@ -38,14 +38,14 @@ def parse_args(argv):
 
     params["user"] = 'test'
     params["passw"] = 'test'
-    params["token"] = ''
+    params["token"] = None
     gitToken = None
     params["verbose"] = True
     params["tag"] = ''
     params["branch"] = 'main'
 
     params["update_operator"] = False
-    params["report"] = False
+    params["report"] = True
     
     params["tolerance"] = 0.001
     params["toleranceType"] = "relative"
@@ -129,7 +129,7 @@ def run_with_params(params, mode="cli"):
                 client.userService.connect(params["user"], params["passw"])
             else:
                 tercenCtx = ctx.TercenContext(params["token"])
-                ctx = tercenCtx.context.client
+                client = tercenCtx.context.client
 
         else:
             client = params["client"] # Running as operator

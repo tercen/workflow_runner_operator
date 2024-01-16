@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from tercen.model.impl import RunWorkflowTask, InitState
+from tercen.model.impl import RunWorkflowTask, InitState, Pair
 
 def msg( message, verbose=False):
     if verbose == True or verbose == "True":
@@ -36,6 +36,11 @@ def run_workflow(workflow, project, client):
     runTask.workflowRev = workflow.rev
     runTask.owner = project.acl.owner
     runTask.projectId = project.id
+    runTask.environment.append(Pair({\
+            "key":"authToken",\
+            "value":client.httpClient.authorization
+        }))
+    
 
     runTask = client.taskService.create(obj=runTask)
     client.taskService.runTask(taskId=runTask.id)

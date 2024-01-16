@@ -250,12 +250,12 @@ def run_with_params(params, mode="cli"):
 def run(argv):
     params = parse_args(argv)
     #http://127.0.0.1:5400/test/w/ac44dd4f14f28b0884cf7c9d600027f1/ds/1ba15e7c-6c3e-4521-81f2-d19fa58a57b9
-    #params["taskId"] = "someId"
+    # params["taskId"] = "someId"
     
     if params["taskId"] != None:
         # TODO Run as operator
-        #tercenCtx = ctx.TercenContext(workflowId="ac44dd4f14f28b0884cf7c9d600027f1",\
-        #                               stepId="1ba15e7c-6c3e-4521-81f2-d19fa58a57b9")
+        # tercenCtx = ctx.TercenContext(workflowId="ac44dd4f14f28b0884cf7c9d600027f1",\
+                                    #   stepId="1ba15e7c-6c3e-4521-81f2-d19fa58a57b9")
         tercenCtx = ctx.TercenContext()
         params["client"] = tercenCtx.context.client
   
@@ -285,7 +285,7 @@ def run(argv):
             params["report"] = True
             params["tolerance"] = tolerance
             params["toleranceType"] = toleranceType.lower()
-            #opMem = 500000000
+            # opMem = 500000000
             if opMem > 0:
                 params["opMem"] = str(opMem)
 
@@ -296,7 +296,8 @@ def run(argv):
                 
 
                 output_str = []
-                outBytes = zlib.compress(json.dumps(st["result"]).encode("utf-8"))
+                # outBytes = zlib.compress(json.dumps(st["result"]).encode("utf-8"))
+                outBytes = json.dumps(st["result"]).encode("utf-8")
                 output_str.append(base64.b64encode(outBytes))
                 
                 checksum = hashlib.md5(outBytes).hexdigest()
@@ -305,12 +306,7 @@ def run(argv):
                                         "workflow": st["workflow"],\
                                         "golden_standard": st["goldenStandard"],\
                                         "status": st["status"]})
-                    
-                    outDf2 = pl.DataFrame({".ci": i,\
-                                           "checksum":checksum,\
-                                           "mimetype":"application/json",\
-                                           ".content":output_str})
-                    
+                   
                 else:
                     outDf =  pl.concat([outDf,\
                                          pl.DataFrame({".ci": i,\
@@ -319,12 +315,22 @@ def run(argv):
                                         "status": st["status"]})\
                                         ])
                     
-                    outDf2 = pl.concat([outDf2,\
-                                        pl.DataFrame({".ci": i,\
-                                                    "checksum":checksum,\
-                                                    "mimetype":"application/json",\
-                                                    ".content":output_str})\
-                                        ])
+
+                if st["status"] == 0:
+                    if outDf.is_empty():
+                        outDf2 = pl.DataFrame({".ci": i,\
+                                "checksum":checksum,\
+                                "filename":"{}.json".format(st["goldenStandard"]), \
+                                "mimetype":"application/json",\
+                                ".content":output_str})
+                    else:
+                        outDf2 = pl.concat([outDf2,\
+                                pl.DataFrame({".ci": i,\
+                                            "checksum":checksum,\
+                                            "filename":"{}.json".format(st["goldenStandard"]), \
+                                            "mimetype":"application/json",\
+                                            ".content":output_str})\
+                                ])
                     
         outDf = outDf.with_columns(pl.col('.ci').cast(pl.Int32))\
                      .with_columns(pl.col('status').cast(pl.Float64))
@@ -334,6 +340,7 @@ def run(argv):
         outDf = tercenCtx.add_namespace(outDf) 
         outDf2 = tercenCtx.add_namespace(outDf2) 
         tercenCtx.save([outDf, outDf2])
+        
     else:
         run_with_params(params)
     

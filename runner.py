@@ -125,7 +125,12 @@ def run_with_params(params, mode="cli"):
     try:
         if params["client"] == None:
             client = TercenClient(params["serviceUri"])
-            client.userService.connect(params["user"], params["passw"])
+            if params["token"] == None:
+                client.userService.connect(params["user"], params["passw"])
+            else:
+                tercenCtx = ctx.TercenContext(params["token"])
+                ctx = tercenCtx.context.client
+
         else:
             client = params["client"] # Running as operator
 
@@ -282,6 +287,7 @@ def run(argv):
             params["branch"] = df[i,1]
             params["tag"] = df[i,2]
             params["gitToken"] = gitToken
+            #FIXME Read this from parameters
             params["report"] = True
             params["tolerance"] = tolerance
             params["toleranceType"] = toleranceType.lower()

@@ -102,17 +102,11 @@ def setup_workflow(client, templateWkf, gsWkf, params):
         workflow = update_operators( workflow, client, params)
     
 
-    #FIXME If nothing changes, the cached version of the computedRelation is used
+    #NOTE If nothing changes, the cached version of the computedRelation is used
     # Not usually a problem, but then we cannot delete the new workflow if needed
     # because it indicates a dependency to the reference workflow
     for stp in workflow.steps:
         if hasattr(stp, "computedRelation"):
-            #TODO Check if this factor actually exists
-            # Operators (like downsize) might not have it
-            # NOTE Adding a filter to avoid caches will break wizard steps
-            # Some new strategy here is needed
-            #stp.model.axis.xyAxis[0].yAxis.axisExtent.y = \
-            #    stp.model.axis.xyAxis[0].yAxis.axisExtent.y+0.1  
             stp.model.operatorSettings.environment.append(Pair({"key":"Cache", "value":"Disable"}))
             if params["opMem"] != None:
                 for p in stp.model.operatorSettings.environment:
@@ -124,7 +118,6 @@ def setup_workflow(client, templateWkf, gsWkf, params):
 
     
     workflow = client.workflowService.create(workflow)
-
 
     update_table_relations(client, workflow, gsWkf, verbose=params["verbose"] )
     update_wizard_factors(client, workflow, gsWkf, verbose=params["verbose"] )
@@ -143,7 +136,6 @@ def update_table_relations(client, workflow, gsWorkflow, verbose=False):
         for stp in util.filter_by_type(workflow.steps, TableStep): #range(0, len(workflow.steps)):
             if stp.id == gsStp.id:
                 stp.model = copy.deepcopy(gsStp.model)
-                #stp.state = copy.deepcopy(gsStp.state)
                 stp.state.taskState = DoneState()
                 stp.name = gsStp.name
                     

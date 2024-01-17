@@ -8,8 +8,6 @@ import workflow_funcs.workflow_setup as workflow_setup, \
     workflow_funcs.workflow_compare as workflow_compare, \
         workflow_funcs.util as util
 
-import tercen.util.helper_functions as tercenUtil
-
 from tercen.client.factory import TercenClient
 
 from tercen.model.impl import InitState,  Workflow, Project, GitProjectTask
@@ -25,28 +23,20 @@ def parse_args(argv):
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
 
-    
-    
-
-    #docker run -t --net=host tercen/workflow_runner:latest --templateRepo=tercen/git_project_test  --gitToken=ddd serviceUri=http://127.0.0.1:5400 --opMem="500000000"
-    # FIXME DEBUG
     templateRepo = "" #"tercen/git_project_test" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
-    params["opMem"] = None #"500000000" #None
+    params["opMem"] = None #"500000000" 
 
     params["user"] = 'test'
     params["passw"] = 'test'
     params["token"] = None
-    gitToken = None
     params["verbose"] = True
     params["tag"] = ''
     params["branch"] = 'main'
-
     params["update_operator"] = False
     params["report"] = True
-    
     params["tolerance"] = 0.001
     params["toleranceType"] = "relative"
 
@@ -54,6 +44,8 @@ def parse_args(argv):
 
     params["serviceUri"] = "http://127.0.0.1:5400"
     params["client"] = None
+
+    gitToken = None
 
     for opt, arg in opts:
         if opt == '-h':
@@ -102,7 +94,6 @@ def parse_args(argv):
         if opt == '--update_operator':
             params["update_operator"] = True
             
-
         if opt == '--report':
             params["report"] = True
     
@@ -116,7 +107,6 @@ def parse_args(argv):
 
     params["gitToken"] = gitToken
 
-    # python3 template_tester.py  --templateRepo=tercen/workflow_lib_repo --templateVersion=latest --templatePath=template_mean_crabs_2.zip --gsRepo=tercen/workflow_lib_repo --gsVersion=latest --gsPath=golden_standard_mean_crabs_2.zip --projectId=2aa4e5e69e49703961f2af4c5e000dd1
     return params
 
 
@@ -134,8 +124,7 @@ def run_with_params(params, mode="cli"):
         else:
             client = params["client"] # Running as operator
 
-        # client = params["client"]
-        # Create temp project to run tests
+        # Create temp project on which to run tests
         project = Project()
         project.name = 'template_test_' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
         project.acl.owner = params['user']
@@ -165,20 +154,13 @@ def run_with_params(params, mode="cli"):
         objs = client.persistentService.getDependentObjects(project.id)
         workflowList = util.filter_by_type(objs, Workflow)
 
-
         verbose = params["verbose"]
         
         statusList=[]
-        
+        allPass = True
         for w in workflowList:
             
             wkfName = w.name
-
-            # FIXME DEBUG
-            #if not wkfName.startswith("Complex"):
-            # if wkfName != "WizardWkf":
-            #    continue
-                
             
             nameParts = wkfName.split("_")
             if not (nameParts[-1].startswith("gs") and len(nameParts) > 1):
@@ -217,6 +199,7 @@ def run_with_params(params, mode="cli"):
                                     "goldenStandard":gsWkf.name,\
                                     "status":0,
                                     "result":resultDict})
+                                allPass = False
                             else:
                                 with open('test_results.json', 'w', encoding='utf-8') as f:
                                     json.dump(resultDict, f, ensure_ascii=False, indent=4)
@@ -235,9 +218,13 @@ def run_with_params(params, mode="cli"):
                     
                         util.msg("Finished Run", verbose)
                             
-                            
-        with open('test_results.json', 'w', encoding='utf-8') as f:
+        if allPass == True: 
+            with open('test_results.json', 'w', encoding='utf-8') as f:
                 json.dump({"Status":"Success"}, f, ensure_ascii=False, indent=4)
+        else:
+            with open('test_results.json', 'w', encoding='utf-8') as f:
+                json.dump(resultList, f, ensure_ascii=False, indent=4)
+            raise Exception("At least one workflow comparison failed. Check the generated reported.")
     except Exception as e:
         util.msg("Workflow runner failed with error: ", True)
         util.msg(traceback.format_exc(), True)
@@ -258,7 +245,6 @@ def run(argv):
     # params["taskId"] = "someId"
     
     if params["taskId"] != None:
-        # TODO Run as operator
         # tercenCtx = ctx.TercenContext(workflowId="ac44dd4f14f28b0884cf7c9d600027f1",\
                                     #   stepId="1ba15e7c-6c3e-4521-81f2-d19fa58a57b9")
         tercenCtx = ctx.TercenContext()
@@ -280,6 +266,7 @@ def run(argv):
         nRepos = df.shape[0]
         outDf = pl.DataFrame()
         outDf2 = pl.DataFrame()
+
         for i in range(0, nRepos):
 
             templateRepo = "https://github.com/" + df[i,0]
@@ -298,11 +285,7 @@ def run(argv):
             statusList = run_with_params(params, mode="operator")
             
             for st in statusList:
-
-                
-
                 output_str = []
-                # outBytes = zlib.compress(json.dumps(st["result"]).encode("utf-8"))
                 outBytes = json.dumps(st["result"]).encode("utf-8")
                 output_str.append(base64.b64encode(outBytes))
                 
@@ -321,7 +304,7 @@ def run(argv):
                                         "status": st["status"]})\
                                         ])
                     
-
+                # Only saves reports for comparisons which went wrong
                 if st["status"] == 0:
                     if outDf.is_empty():
                         outDf2 = pl.DataFrame({".ci": i,\
@@ -351,9 +334,5 @@ def run(argv):
         run_with_params(params)
     
 
-
-
-
 if __name__ == '__main__':
-    #absPath = os.path.dirname(os.path.abspath(__file__))
     run(sys.argv[1:])

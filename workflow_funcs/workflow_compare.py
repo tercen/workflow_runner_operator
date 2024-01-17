@@ -214,7 +214,6 @@ def __get_colnames(cRel):
     return cnames
 
 
-#FIXME Not comparing Gather and Join steps at the moment
 def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", tableComp=[], verbose=False):
     stepResult = {}
 

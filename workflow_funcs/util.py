@@ -36,12 +36,7 @@ def run_workflow(workflow, project, client):
     runTask.workflowRev = workflow.rev
     runTask.owner = project.acl.owner
     runTask.projectId = project.id
-    runTask.environment.append(Pair({\
-            "key":"token",\
-            "value":client.httpClient.authorization
-        }))
-    
-    os.environ["token"] = client.httpClient.authorization
+
     runTask = client.taskService.create(obj=runTask)
     client.taskService.runTask(taskId=runTask.id)
     runTask = client.taskService.waitDone(taskId=runTask.id)

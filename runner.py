@@ -19,15 +19,16 @@ def parse_args(argv):
     opts, args = getopt.getopt(argv,"",
                                ["templateRepo=", "gitToken=", "tag=", "branch=",
                                 "update_operator", "quiet", "report", "opMem=",
+                                "templateFolder=", \
                                 "serviceUri=", "user=", "passw=", "token=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
-
-    templateRepo = "" #"tercen/git_project_test" 
+    #python3 /workspaces/workflow_runner/runner.py --templateRepo=tercen/scyan_operator
+    templateRepo = "" #"tercen/image_analysis_STK_workflowRunner_template" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
-    params["opMem"] = None #"500000000" 
+    params["opMem"] = "" #"1000000000" 
 
     params["user"] = 'test'
     params["passw"] = 'test'
@@ -39,6 +40,8 @@ def parse_args(argv):
     params["report"] = True
     params["tolerance"] = 0.001
     params["toleranceType"] = "relative"
+
+    params["templateFolder"] = "tests" #None
 
     params["taskId"] = None
 
@@ -63,6 +66,9 @@ def parse_args(argv):
 
         if opt == '--opMem':
             params["opMem"] = arg
+
+        if opt == '--templateFolder':
+            params["templateFolder"] = arg
 
         if opt == '--user':
             params["user"] = arg
@@ -111,7 +117,7 @@ def parse_args(argv):
 
 
 def run_with_params(params, mode="cli"):
-    resultList = []
+    resultList = {}
     try:
         if params["client"] == None:
             client = TercenClient(params["serviceUri"])
@@ -154,6 +160,8 @@ def run_with_params(params, mode="cli"):
         objs = client.persistentService.getDependentObjects(project.id)
         workflowList = util.filter_by_type(objs, Workflow)
 
+        
+
         verbose = params["verbose"]
         
         statusList=[]
@@ -161,62 +169,71 @@ def run_with_params(params, mode="cli"):
         for w in workflowList:
             
             wkfName = w.name
+
+
+
+            folderId = w.folderId
+            if folderId == "" or util.is_golden_standard(wkfName):
+                continue
             
-            nameParts = wkfName.split("_")
-            if not (nameParts[-1].startswith("gs") and len(nameParts) > 1):
-                wkf = w
-                gsWkf = None
-                for w2 in workflowList:
-                    nameParts = w2.name.split("_")
-                    if w2.name == (wkfName + "_" + nameParts[-1]):
-                        gsWkf = w2
 
-                        
-                        util.msg( "Testing template {} against {}.".format(wkfName, gsWkf.name ), verbose )
-                        
-                        workflowRun = workflow_setup.setup_workflow(client, wkf, gsWkf=gsWkf, params=params)
+            if params["templateFolder"] != None:
+                folder = client.folderService.get(folderId)
+                if folder.name != params["templateFolder"]:
+                    continue
+
+            gsList = util.filter_by_golden_standard( workflowList, wkfName)
+
+            wkf = w
+            gsWkf = None
+            for w2 in gsList:
+                gsWkf = w2
+                util.msg( "Testing template {} against {}.".format(wkfName, gsWkf.name ), verbose )
+                
+                workflowRun = workflow_setup.setup_workflow(client, wkf, gsWkf=gsWkf, params=params)
+            
+                util.msg("Running all steps", verbose)
+                util.run_workflow(workflowRun, project, client)
+                util.msg("Done", verbose)
+
+                # Retrieve the updated, ran workflow
+                workflowRun = client.workflowService.get(workflowRun.id)
+
+                util.msg("Comparing Results", verbose)
+                resultDict = workflow_compare.diff_workflow(client, workflowRun, gsWkf,  params["tolerance"],
+                                        params["toleranceType"], verbose)
+
+
+                if resultDict != None and resultDict != []:
+                    if params["report"] == True:
+                        resultDict = {w2.name: resultDict[0]}
+                        resultList = {**resultList, **resultDict}
+
+                        util.msg("{} and {} comparison FAILED".format(\
+                            wkfName, gsWkf.name), verbose)
+                        statusList.append({\
+                            "workflow":wkfName,\
+                            "goldenStandard":gsWkf.name,\
+                            "status":0,
+                            "result":resultDict})
+                        allPass = False
+                    else:
+                        with open('test_results.json', 'w', encoding='utf-8') as f:
+                            json.dump(resultDict, f, ensure_ascii=False, indent=4)
+
+                        raise Exception("Comparison between {} and {} failed.".format(\
+                            wkfName, gsWkf.name))
                     
-
-                        util.msg("Running all steps", verbose)
-                        util.run_workflow(workflowRun, project, client)
-                        util.msg("Done", verbose)
-
-                        # Retrieve the updated, ran workflow
-                        workflowRun = client.workflowService.get(workflowRun.id)
-
-                        util.msg("Comparing Results", verbose)
-                        resultDict = workflow_compare.diff_workflow(client, workflowRun, gsWkf,  params["tolerance"],
-                                                params["toleranceType"], verbose)
-
-
-                        if resultDict != None and resultDict != []:
-                            if params["report"] == True:
-                                resultList.append({w2.name: resultDict[0]})   
-                                util.msg("{} and {} comparison FAILED".format(\
-                                    wkfName, gsWkf.name), verbose)
-                                statusList.append({\
-                                    "workflow":wkfName,\
-                                    "goldenStandard":gsWkf.name,\
-                                    "status":0,
-                                    "result":resultDict})
-                                allPass = False
-                            else:
-                                with open('test_results.json', 'w', encoding='utf-8') as f:
-                                    json.dump(resultDict, f, ensure_ascii=False, indent=4)
-
-                                raise Exception("Comparison between {} and {} failed.".format(\
-                                    wkfName, gsWkf.name))
-                            
-                        else:
-                            util.msg("{} and {} comparison was SUCCESSFUL".format(\
-                                wkfName, gsWkf.name), verbose)
-                            statusList.append({\
-                                    "workflow":wkfName,\
-                                    "goldenStandard":gsWkf.name,\
-                                    "status":1,
-                                    "result":{}})
-                    
-                        util.msg("Finished Run", verbose)
+                else:
+                    util.msg("{} and {} comparison was SUCCESSFUL".format(\
+                        wkfName, gsWkf.name), verbose)
+                    statusList.append({\
+                            "workflow":wkfName,\
+                            "goldenStandard":gsWkf.name,\
+                            "status":1,
+                            "result":{}})
+            
+                util.msg("Finished Run", verbose)
                             
         if allPass == True: 
             with open('test_results.json', 'w', encoding='utf-8') as f:

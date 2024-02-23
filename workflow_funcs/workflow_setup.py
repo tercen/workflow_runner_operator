@@ -1,4 +1,4 @@
-import copy
+import copy, collections.abc
 from datetime import datetime
 
 import workflow_funcs.util as util
@@ -11,9 +11,9 @@ import numpy as np
 
 from datetime import datetime
 
-from pytson import encodeTSON
 
 
+from workflow_funcs.util import filter_by_type
 
 def get_installed_operator(client,  opName, opUrl, opVersion, params, verbose=False):
     installedOperators = client.documentService.findOperatorByOwnerLastModifiedDate(params['user'], '')
@@ -67,14 +67,15 @@ def update_operators( workflow, client, params):
             opIdx = util.which([op.name == opName for op in operatorLib])
 
             if opIdx != []:
-                if len(opIdx) > 1:
+                if isinstance(opIdx, collections.abc.Sequence) and len(opIdx) > 1:
                     #TODO if there are multiple versions, find the latest
+                    #FIXME Issue#10
                     pass
 
                 libOp = operatorLib[opIdx]
                 if libOp.version > opVersion:
                     util.msg("Updating {} operator from version {} to version {}".format(\
-                        opName, libOp.version, opVersion), params["verbose"])
+                        opName, opVersion, libOp.version), params["verbose"])
                     
                     operator = get_installed_operator(client,  \
                                                       libOp.name, \
@@ -119,8 +120,10 @@ def setup_workflow(client, templateWkf, gsWkf, params):
     
     workflow = client.workflowService.create(workflow)
 
-    update_table_relations(client, workflow, gsWkf, verbose=params["verbose"] )
-    update_wizard_factors(client, workflow, gsWkf, verbose=params["verbose"] )
+    update_table_relations( workflow, gsWkf, verbose=params["verbose"] )
+    update_wizard_factors( workflow, gsWkf, verbose=params["verbose"] )
+    update_shiny_steps( workflow, gsWkf, verbose=params["verbose"] )
+
 
     workflow.addMeta("RUN_WIZARD_STEP", "true")
 
@@ -128,8 +131,35 @@ def setup_workflow(client, templateWkf, gsWkf, params):
 
     return workflow
 
+def is_shiny_operator(step):
+    mdl = step.model #.operatorSettings.operatorRef.operatorKind
+
+    isShiny = False
+    if hasattr(mdl, "operatorSettings"):
+        ops = mdl.operatorSettings
+        if hasattr(ops, "operatorRef"):
+            isShiny = ops.operatorRef.operatorKind == "ShinyOperator"
+
+
+    return isShiny
+
+# Copy
+def update_shiny_steps( workflow, gsWorkflow, verbose=False):
+    util.msg("Setting Interactive Steps.", verbose)
+
+
+    for gsStp in filter_by_type(gsWorkflow.steps, DataStep):
+        for stp in filter_by_type(workflow.steps, DataStep): #range(0, len(workflow.steps)):
+            if stp.id == gsStp.id and is_shiny_operator(stp) and is_shiny_operator(gsStp):
+                stp.model = copy.deepcopy(gsStp.model)
+                # FIXME
+                # Might need to copy the computed relation too
+                stp.computedRelation = copy.deepcopy(gsStp.computedRelation)
+                stp.state.taskState = DoneState()
+
+
 # Separate function for legibility
-def update_table_relations(client, workflow, gsWorkflow, verbose=False):
+def update_table_relations( workflow, gsWorkflow, verbose=False):
     util.msg("Setting up table step references in new workflow.", verbose)
 
     for gsStp in util.filter_by_type(gsWorkflow.steps, TableStep):
@@ -140,7 +170,7 @@ def update_table_relations(client, workflow, gsWorkflow, verbose=False):
                 stp.name = gsStp.name
                     
 
-def update_wizard_factors(client, workflow, gsWorkflow, verbose=False):
+def update_wizard_factors( workflow, gsWorkflow, verbose=False):
     util.msg("Updating Wizard factors.", verbose)
 
     for gsStp in util.filter_by_type(gsWorkflow.steps, WizardStep):

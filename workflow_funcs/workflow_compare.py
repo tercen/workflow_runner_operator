@@ -11,7 +11,8 @@ import tercen.util.helper_functions as utl
 import tercen.http.HttpClientService as th
 
 def isnumeric(val):
-    return isinstance(val, int) or isinstance(val, float)
+    
+    return isinstance(val, np.number ) or isinstance(val, int) or isinstance(val, float)
 
 
 def polarDtype_to_numpyDtype(plType):
@@ -90,7 +91,7 @@ def get_simple_relation_id_list(obj):
     return idList
 
 
-def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="Absolute", verbose=False):
+def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="absolute", verbose=False):
     tableRes = {}
     hasDiff = False
 
@@ -148,8 +149,10 @@ def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="Absolute
 
             
             testEqualityOnly = False
-            if not isnumeric(col["columns"][0]["values"]) or not isnumeric(refColVals):
+            
+            if not isnumeric(col["columns"][0]["values"][0]) or not isnumeric(refColVals[0]):
                 testEqualityOnly = True
+
 
 
             if isnumeric(col["columns"][0]["values"]):
@@ -159,7 +162,7 @@ def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="Absolute
 
             rel = np.zeros((len(colVals)))
             for w in range(0, len(colVals)):
-                if testEqualityOnly or tolType == "equality":
+                if testEqualityOnly or tolType.lower() == "equality":
                     if refColVals[w] == colVals[w]:
                         rel[w] = 0
                     else:
@@ -174,6 +177,7 @@ def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="Absolute
                             rel[w] = 9999
                     else:
                         rel[w] = abs(1-colVals[w]/(refColVals[w]))
+            
             
             
             if np.any(rel > tol):
@@ -192,6 +196,9 @@ def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="Absolute
 
                 hasDiff = True
     
+    if hasDiff == True:
+        print(".")
+
     return [tableRes, hasDiff]
     
 
@@ -271,12 +278,12 @@ def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", tabl
                         schema = client.tableSchemaService.get(idList[k])
                         refSchema = client.tableSchemaService.get(refIdList[k])
                         
-                        res = compare_schema(client, w, schema, refSchema,  tol)
+                        res = compare_schema(client, w, schema, refSchema,  tol, tolType=tolType)
                         tableRes = res[0]
                         hasDiff = res[1]
 
                 if hasDiff == True:
-                    tableRes["TableIdx"]:tableIdx+1
+                    tableRes["TableIdx"] = tableIdx+1
                     stepResult = {**stepResult, **tableRes}
                 
                 k = k +1

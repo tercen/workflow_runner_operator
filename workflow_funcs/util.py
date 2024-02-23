@@ -1,5 +1,5 @@
 from datetime import datetime
-import os
+import re
 from tercen.model.impl import RunWorkflowTask, InitState, Pair
 
 def msg( message, verbose=False):
@@ -26,6 +26,32 @@ def filter_by_type( objList, cls, parent=False ):
             typeList.append(o)
 
     return typeList
+
+
+def is_golden_standard( name, baseName=None ):
+    if baseName == None:
+        return re.search("[A-Za-z0-9]+_gs[A-Za-z0-9]+$", name) != None
+    else:
+        return re.search("{}_gs[A-Za-z0-9]+$".format(baseName), name) != None
+
+def filter_by_golden_standard( objList, wkfName):
+    gsList = []
+    for o in objList:
+        if is_golden_standard(o.name, baseName=wkfName):
+            gsList.append(o)
+
+    return gsList
+
+def filter_by_field_value( objList, fieldName, fieldValue ):
+    outList = []
+    
+    for o in objList:
+        
+        if fieldName in list(o.__dict__.keys()) and o.__dict__[fieldName] == fieldValue:
+            outList.append(o)
+
+
+    return outList
 
 
 def run_workflow(workflow, project, client):

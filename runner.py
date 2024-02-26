@@ -28,7 +28,7 @@ def parse_args(argv):
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
-    params["opMem"] = "" #"1000000000" 
+    params["opMem"] = None #"1000000000" 
 
     params["user"] = 'test'
     params["passw"] = 'test'

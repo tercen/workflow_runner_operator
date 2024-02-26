@@ -196,8 +196,6 @@ def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="absolute
 
                 hasDiff = True
     
-    if hasDiff == True:
-        print(".")
 
     return [tableRes, hasDiff]
     
@@ -219,6 +217,54 @@ def __get_colnames(cRel):
 
     cnames = list(set(cnames))
     return cnames
+
+
+def compare_export_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", tableComp=[], verbose=False,\
+                 wkfName=None, refWkfName=None, projectId=None):
+    
+    expName = "Export-{}-{}".format(wkfName, stp.name)
+    gsExpName = "Export-{}-{}".format(refWkfName, refStp.name)
+
+    util.msg("Comparing export tables {} vs {}".format(expName, gsExpName),
+              verbose=verbose)
+
+    objs = client.persistentService.getDependentObjects(projectId)
+    
+    schemas = util.filter_by_type(objs, TableSchema)
+
+    schema = None
+    gsSchema = None
+
+    for sch in schemas:
+        if sch.name == expName:
+            schema = sch
+
+        if sch.name == gsExpName:
+            gsSchema = sch
+
+    stpRes = {"Name":stp.name}
+
+
+    if schema is None:
+        stpRes["ExportTable"] = "Result for export step {} not found. \
+                            Expecting {}".format( stp.name, expName ) 
+        return stpRes
+        
+    if schema is None:
+        stpRes["GSExportTable"] = "Result for export step {} not found for the golden standard. \
+                            Expecting {}".format( stp.name, expName ) 
+        return stpRes
+
+
+    res = compare_schema(client, 0, schema, gsSchema,  tol, tolType=tolType)
+    tableRes = res[0]
+    hasDiff = res[1]
+
+    if hasDiff:
+        return {**stpRes, **tableRes}
+    else:
+        return {}
+
 
 
 def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", tableComp=[], verbose=False):
@@ -287,6 +333,8 @@ def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", tabl
                     stepResult = {**stepResult, **tableRes}
                 
                 k = k +1
+    #elif isinstance(stp, ExportStep):
+
 
     return stepResult
 
@@ -305,6 +353,13 @@ def diff_workflow(client, workflow, refWorkflow,  tol=0, tolType="absolute", ver
             if isinstance(stp.state.taskState, DoneState) and isinstance(refStp.state.taskState, DoneState):
                 stepRes = compare_step(client, i, stp, refStp,  tol, tolType, verbose)
 
+                if len(stepRes) > 0:
+                    resultDict.append(stepRes)
+            elif isinstance(stp, ExportStep) and isinstance(refStp, ExportStep): 
+                stepRes = compare_export_step(client, i, stp, refStp,  tol, tolType,\
+                                              wkfName=workflow.name, refWkfName=refWorkflow.name,\
+                                              projectId=workflow.projectId, \
+                                                  verbose=verbose )
                 if len(stepRes) > 0:
                     resultDict.append(stepRes)
             else:

@@ -158,7 +158,9 @@ def update_step_operator( workflow, client, params):
         #'8dc8eaf35e5f0c00f7d2617ae9c206f464b1b8db\tHEAD'
         #'8dc8eaf35e5f0c00f7d2617ae9c206f464b1b8db\trefs/heads/main'
         #'25cda60a7d213ee60ddb0469cf7b12c9436954ff\trefs/tags/0.0.1'
+
         headLine = commitList.split("\n")[0].split("\t")
+        util.msg("Found {}".format(headLine), verbose=params["verbose"])
         opVersion = headLine[0]
 
 

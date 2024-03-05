@@ -30,9 +30,9 @@ def filter_by_type( objList, cls, parent=False ):
 
 def is_golden_standard( name, baseName=None ):
     if baseName == None:
-        return re.search("[A-Za-z0-9]+_gs[A-Za-z0-9]+$", name) != None
+        return re.search("[A-Za-z0-9]+_gs[A-Za-z0-9]*$", name) != None
     else:
-        return re.search("{}_gs[A-Za-z0-9]+$".format(baseName), name) != None
+        return re.search("{}_gs[A-Za-z0-9]*$".format(baseName), name) != None
 
 def filter_by_golden_standard( objList, wkfName):
     gsList = []
@@ -66,3 +66,23 @@ def run_workflow(workflow, project, client):
     runTask = client.taskService.create(obj=runTask)
     client.taskService.runTask(taskId=runTask.id)
     runTask = client.taskService.waitDone(taskId=runTask.id)
+
+
+def parse_config_file(configFile, client):
+    fileBytes = client.fileService.download(configFile.id)
+    data = fileBytes.fp.read()
+
+    lines = str.split(data.decode("utf-8"), "\n")
+
+    cfgDict = {\
+        "STEP_NAME":"",\
+        "VERSION":"latest",\
+        "BRANCH":"main"\
+    }
+
+    for l in lines:
+        if not l.startswith("#") and "=" in l:
+            keyValue = l.split("=")
+            cfgDict[keyValue[0]] = keyValue[1]
+
+    return cfgDict

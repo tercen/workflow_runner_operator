@@ -1,5 +1,6 @@
 import string, random, traceback, hashlib,\
         json, sys, getopt, os,  base64
+from pathlib import Path
 
 import polars as pl
 
@@ -10,7 +11,7 @@ import workflow_funcs.workflow_setup as workflow_setup, \
 
 from tercen.client.factory import TercenClient
 
-from tercen.model.impl import InitState,  Workflow, Project, GitProjectTask
+from tercen.model.impl import InitState,  Workflow, Project, GitProjectTask, FileDocument
 from tercen.client import context as ctx
 
 
@@ -24,7 +25,8 @@ def parse_args(argv):
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
     #python3 /workspaces/workflow_runner/runner.py --templateRepo=tercen/scyan_operator
-    templateRepo = "" #"tercen/image_analysis_STK_workflowRunner_template" 
+    #tercen/scyan_operator
+    templateRepo = "tercen/image_analysis_STK_workflowRunner_template" #"tercen/image_analysis_STK_workflowRunner_template" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
@@ -137,7 +139,7 @@ def run_with_params(params, mode="cli"):
         project = client.projectService.create(project)
         params["projectId"] = project.id
 
-        # Clone the template project from git
+        # Clone the template project from git into the temp project
         importTask = GitProjectTask()
         importTask.owner = params['user']
         importTask.state = InitState()
@@ -147,40 +149,51 @@ def run_with_params(params, mode="cli"):
         importTask.addMeta("GIT_ACTION", "reset/pull")
         importTask.addMeta("GIT_PAT", params["gitToken"])
         importTask.addMeta("GIT_URL", params["templateRepo"])
-        
         importTask.addMeta("GIT_BRANCH",params["branch"])
         importTask.addMeta("GIT_MESSAGE", "")
         importTask.addMeta("GIT_TAG", params["tag"])
-
 
         importTask = client.taskService.create(importTask)
         client.taskService.runTask(importTask.id)
         importTask = client.taskService.waitDone(importTask.id)
         
+
         objs = client.persistentService.getDependentObjects(project.id)
         workflowList = util.filter_by_type(objs, Workflow)
-
-        
-
+        # fileList is retrieved to search for configuration files, if any
+        fileList = util.filter_by_type(objs, FileDocument)
         verbose = params["verbose"]
         
+        util.msg( "Searching for workflows in {}/{}".format(params["templateRepo"], params["templateFolder"] ), verbose )
+
         statusList=[]
         allPass = True
         for w in workflowList:
-            
             wkfName = w.name
-
-
-
             folderId = w.folderId
-            if folderId == "" or util.is_golden_standard(wkfName):
+
+            if util.is_golden_standard(wkfName):
                 continue
-            
+            if folderId != "":
+                folder = client.folderService.get(folderId)
+            else:
+                folder = ""
 
             if params["templateFolder"] != None:
-                folder = client.folderService.get(folderId)
                 if folder.name != params["templateFolder"]:
                     continue
+            util.msg( "Found {}/{}".format(folder.name, wkfName ), verbose )
+            # Clear possible previous configurations
+            params["config"] = None
+
+            for f in fileList:
+                if Path(f.name).stem == wkfName:
+                    configFile = f
+                    params["config"] = util.parse_config_file(configFile, client)
+
+                    util.msg( "Config file detected for workflow", verbose )
+                    break
+            
 
             gsList = util.filter_by_golden_standard( workflowList, wkfName)
 
@@ -191,7 +204,9 @@ def run_with_params(params, mode="cli"):
                 util.msg( "Testing template {} against {}.".format(wkfName, gsWkf.name ), verbose )
                 
                 workflowRun = workflow_setup.setup_workflow(client, wkf, gsWkf=gsWkf, params=params)
-            
+
+
+                resultDict = []
                 util.msg("Running all steps", verbose)
                 util.run_workflow(workflowRun, project, client)
                 util.msg("Done", verbose)

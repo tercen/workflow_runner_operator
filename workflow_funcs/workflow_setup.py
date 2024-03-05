@@ -1,4 +1,4 @@
-import copy, collections.abc
+import copy, collections.abc, subprocess
 from datetime import datetime
 
 import workflow_funcs.util as util
@@ -101,6 +101,10 @@ def setup_workflow(client, templateWkf, gsWkf, params):
     if params["update_operator"] == True:
         util.msg("Checking for updated operator versions", params["verbose"])
         workflow = update_operators( workflow, client, params)
+
+    if "config" in params and not params["config"] is None:
+        util.msg("Configuring workflow operator", params["verbose"])
+        workflow = update_step_operator( workflow, client, params)
     
 
     #NOTE If nothing changes, the cached version of the computedRelation is used
@@ -131,6 +135,48 @@ def setup_workflow(client, templateWkf, gsWkf, params):
 
     return workflow
 
+def update_step_operator( workflow, client, params):
+    cfg = params["config"]
+
+    stepName = cfg["STEP_NAME"]
+    opUrl = params["templateRepo"]
+    opVersion = cfg["VERSION"]
+    opName = opUrl.split("/")[-1]
+
+
+    if opVersion == "latest":
+        #git ls-remote https://github.com/tercen/scyan_operator.git
+        commitList = subprocess.check_output(["git", "ls-remote", "{}.git".format(opUrl)])
+        commitList = commitList.decode("utf-8")
+
+        # Example output
+        #'8dc8eaf35e5f0c00f7d2617ae9c206f464b1b8db\tHEAD'
+        #'8dc8eaf35e5f0c00f7d2617ae9c206f464b1b8db\trefs/heads/main'
+        #'25cda60a7d213ee60ddb0469cf7b12c9436954ff\trefs/tags/0.0.1'
+        headLine = commitList.split("\n")[0].split("\t")
+        opVersion = headLine[0]
+
+
+    stepFound = False
+    for stp in workflow.steps:
+        if stp.name == stepName:
+            stepFound = True
+            util.msg("Setting up operator for step '{}':".format(stepName), verbose=params["verbose"])
+            opRef = stp.model.operatorSettings.operatorRef
+            util.msg("    Name: {} -> {}:".format(opRef.name, opName), verbose=params["verbose"])
+            util.msg("    Version: {} -> {}:".format(opRef.version, opVersion), verbose=params["verbose"])
+
+            operator = get_installed_operator(client,  opName, opUrl, opVersion, params, verbose=params["verbose"])
+
+            stp.model.operatorSettings.operatorRef.operatorId = operator.id
+            stp.model.operatorSettings.operatorRef.name = operator.name
+            stp.model.operatorSettings.operatorRef.url = operator.url
+            stp.model.operatorSettings.operatorRef.version = operator.version
+
+    #TODO print message if operator name was not found
+
+    return workflow
+
 def is_shiny_operator(step):
     mdl = step.model #.operatorSettings.operatorRef.operatorKind
 
@@ -142,6 +188,17 @@ def is_shiny_operator(step):
 
 
     return isShiny
+
+
+def update_table_relations( workflow, gsWorkflow, verbose=False):
+    util.msg("Setting up table step references in new workflow.", verbose)
+
+    for gsStp in util.filter_by_type(gsWorkflow.steps, TableStep):
+        for stp in util.filter_by_type(workflow.steps, TableStep): #range(0, len(workflow.steps)):
+            if stp.id == gsStp.id:
+                stp.model = copy.deepcopy(gsStp.model)
+                stp.state.taskState = DoneState()
+                stp.name = gsStp.name
 
 # Copy
 def update_shiny_steps( workflow, gsWorkflow, verbose=False):

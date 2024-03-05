@@ -98,6 +98,8 @@ def setup_workflow(client, templateWkf, gsWkf, params):
     workflow.name = "{}_{}".format(templateWkf.name, datetime.now().strftime("%Y%m%d_%H%M%S"))
     workflow.id = ''
 
+    workflow = check_install_operators( workflow, client, params)
+
     if params["update_operator"] == True:
         util.msg("Checking for updated operator versions", params["verbose"])
         workflow = update_operators( workflow, client, params)
@@ -134,6 +136,28 @@ def setup_workflow(client, templateWkf, gsWkf, params):
     client.workflowService.update(workflow)
 
     return workflow
+
+def check_install_operators( workflow, client, params):
+    stepFound = False
+    for stp in workflow.steps:
+        if hasattr(stp.model, "operatorSettings"):
+            opRef = stp.model.operatorSettings.operatorRef
+
+            util.msg("Checking operator {} install for step '{}':".format(opRef.name, stp.name), verbose=params["verbose"])
+
+            operator = get_installed_operator(client,  opRef.name, \
+                                              opRef.url, opRef.version, params, verbose=params["verbose"])
+
+            stp.model.operatorSettings.operatorRef.operatorId = operator.id
+            stp.model.operatorSettings.operatorRef.name = operator.name
+            stp.model.operatorSettings.operatorRef.url = operator.url
+            stp.model.operatorSettings.operatorRef.version = operator.version
+
+    #TODO print message if operator name was not found
+
+    return workflow
+
+
 
 def update_step_operator( workflow, client, params):
     cfg = params["config"]

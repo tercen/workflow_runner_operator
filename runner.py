@@ -26,7 +26,7 @@ def parse_args(argv):
                                 )
     #python3 /workspaces/workflow_runner/runner.py --templateRepo=tercen/scyan_operator
     #tercen/scyan_operator
-    templateRepo = "tercen/image_analysis_STK_workflowRunner_template" #"tercen/image_analysis_STK_workflowRunner_template" 
+    templateRepo = "" #"tercen/image_analysis_STK_workflowRunner_template" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
@@ -367,7 +367,5 @@ def run(argv):
     
 
 if __name__ == '__main__':
-    if not sys.argv is None and len(sys.argv) > 1:
-        run(sys.argv[1:])
-    else:
-        run(sys.argv)
+    run(sys.argv[1:])
+

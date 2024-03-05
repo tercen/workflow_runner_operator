@@ -150,6 +150,7 @@ def update_step_operator( workflow, client, params):
 
     if opVersion == "latest":
         #git ls-remote https://github.com/tercen/scyan_operator.git
+        util.msg("Checking latest commit tag", verbose=params["verbose"])
         commitList = subprocess.check_output(["git", "ls-remote", "{}.git".format(opUrl)])
         commitList = commitList.decode("utf-8")
 

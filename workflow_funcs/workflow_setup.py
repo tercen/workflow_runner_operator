@@ -162,7 +162,7 @@ def update_step_operator( workflow, client, params):
 
         #headLine = commitList.split("\n")[0].split("\t")
         #util.msg("Found {}".format(headLine), verbose=params["verbose"])
-        opVersion = "" #headLine[0]
+        opVersion = "main" #headLine[0]
 
 
     stepFound = False

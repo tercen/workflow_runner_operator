@@ -32,7 +32,7 @@ def get_installed_operator(client,  opName, opUrl, opVersion, params, verbose=Fa
         installTask.version = opVersion
         installTask.gitToken = params["gitToken"]
         
-        installTask.testRequired = True
+        installTask.testRequired = False
         installTask.isDeleted = False
         installTask.owner = params["user"]
 

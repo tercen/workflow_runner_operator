@@ -26,7 +26,7 @@ def parse_args(argv):
                                 )
     #python3 /workspaces/workflow_runner/runner.py --templateRepo=tercen/scyan_operator
     #tercen/scyan_operator
-    templateRepo = "" #"tercen/image_analysis_STK_workflowRunner_template" 
+    templateRepo = "tercen/scyan_operator" #"tercen/image_analysis_STK_workflowRunner_template" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
@@ -43,7 +43,7 @@ def parse_args(argv):
     params["tolerance"] = 0.001
     params["toleranceType"] = "relative"
 
-    params["templateFolder"] = "tests" #None
+    params["templateFolder"] = "workflow_tests" #None
 
     params["taskId"] = None
 
@@ -177,7 +177,7 @@ def run_with_params(params, mode="cli"):
             if folderId != "":
                 folder = client.folderService.get(folderId)
             else:
-                folder = ""
+                folder.name = ""
 
             if params["templateFolder"] != None:
                 if folder.name != params["templateFolder"]:

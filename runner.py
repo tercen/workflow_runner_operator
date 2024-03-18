@@ -168,6 +168,7 @@ def run_with_params(params, mode="cli"):
 
         statusList=[]
         allPass = True
+        foundTests = False
         for w in workflowList:
             wkfName = w.name
             folderId = w.folderId
@@ -203,7 +204,7 @@ def run_with_params(params, mode="cli"):
             for w2 in gsList:
                 gsWkf = w2
                 util.msg( "Testing template {} against {}.".format(wkfName, gsWkf.name ), verbose )
-                
+                foundTests = True
                 workflowRun = workflow_setup.setup_workflow(client, wkf, gsWkf=gsWkf, params=params)
 
 
@@ -250,6 +251,8 @@ def run_with_params(params, mode="cli"):
                             "result":{}})
             
                 util.msg("Finished Run", verbose)
+        if foundTests == False:
+            raise Exception("No tests were found in folder {}.".format(params["templateFolder"]))
                             
         if allPass == True: 
             with open('test_results.json', 'w', encoding='utf-8') as f:

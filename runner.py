@@ -26,7 +26,7 @@ def parse_args(argv):
                                 )
     #python3 /workspaces/workflow_runner/runner.py --templateRepo=tercen/scyan_operator
     #tercen/scyan_operator
-    templateRepo = "" #"tercen/flow_core_immunophenotyping_template" #"tercen/image_analysis_STK_workflowRunner_template" 
+    templateRepo = "tercen/flow_core_immunophenotyping_template" #"tercen/image_analysis_STK_workflowRunner_template" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
@@ -39,7 +39,7 @@ def parse_args(argv):
     params["tag"] = ''
     params["branch"] = 'main'
     params["update_operator"] = False
-    params["report"] = True
+    params["report"] = False
     params["tolerance"] = 0.001
     params["toleranceType"] = "relative"
 

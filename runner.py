@@ -264,8 +264,14 @@ def run_with_params(params, mode="cli"):
             with open('test_results.json', 'w', encoding='utf-8') as f:
                 json.dump({"Status":"Success"}, f, ensure_ascii=False, indent=4)
         else:
-            with open('test_results.json', 'w', encoding='utf-8') as f:
-                json.dump(resultList, f, ensure_ascii=False, indent=4)
+            if isinstance(resultList, dict):
+                with open('test_results.json', 'w', encoding='utf-8') as f:
+                    json.dump(resultList, f, ensure_ascii=False, indent=4)
+            else:
+                with open('test_results.json', "w") as f:
+                    for line in resultList:
+                        f.write(" ".join(line) + "\n") 
+                            
             raise Exception("At least one workflow comparison failed. Check the generated reported.")
     except Exception as e:
         util.msg("Workflow runner failed with error: ", True)

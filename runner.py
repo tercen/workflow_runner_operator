@@ -235,8 +235,14 @@ def run_with_params(params, mode="cli"):
                             "result":resultDict})
                         allPass = False
                     else:
-                        with open('test_results.json', 'w', encoding='utf-8') as f:
-                            json.dump(resultDict, f, ensure_ascii=False, indent=4)
+                        if isinstance(resultDict, dict):
+                            with open('test_results.json', 'w', encoding='utf-8') as f:
+                                json.dump(resultDict, f, ensure_ascii=False, indent=4)
+                        else:
+                            with open('test_results.json', "w") as f:
+                                for line in resultDict:
+                                    f.write(" ".join(line) + "\n") 
+                            
 
                         raise Exception("Comparison between {} and {} failed.".format(\
                             wkfName, gsWkf.name))

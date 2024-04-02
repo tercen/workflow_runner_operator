@@ -11,7 +11,6 @@ import tercen.util.helper_functions as utl
 import tercen.http.HttpClientService as th
 
 def isnumeric(val):
-    
     return isinstance(val, np.number ) or isinstance(val, int) or isinstance(val, float)
 
 
@@ -187,7 +186,7 @@ def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="absolute
                     "RefValues":refColVals,
                     "Values":colVals,
                     "OutOfRangeIdx":util.which(rel > tol),
-                    "CompResult":rel
+                    "CompResult":list(rel)
                 }
                 if hasattr(tableRes, "ColumnResults"):
                     tableRes["ColumnResults"].append(colResult)

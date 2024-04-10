@@ -279,9 +279,9 @@ def run_with_params(params, mode="cli"):
 
         raise e
         
-    finally:
-        if project != None and client != None:
-            client.workflowService.delete(project.id, project.rev)
+    # finally:
+    #     if project != None and client != None:
+    #         client.workflowService.delete(project.id, project.rev)
 
     if mode == "operator":
         return statusList

@@ -324,7 +324,7 @@ def run(argv):
         for i in range(0, nRepos):
             params["templateRepo"] = df[i,"repository"]
             params["branch"] = df[i,"branch"]
-            params["tag"] = df[i,"tag"]
+            params["tag"] = df[i,"version"]
             params["gitToken"] = gitToken
             #FIXME Read this from parameters
             params["report"] = False

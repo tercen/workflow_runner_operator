@@ -109,7 +109,19 @@ The workflow runner is contained within a docker and can be called like the exam
 
 
 
+## Operator Mode
 
+The workflow runner can be executed as an operator within a workflow. The operator will perform the tests for each set of repository, branch and version found in the input.
+
+Factor name **must be as indicated in the table below.**
+
+#### Input Projection (Column Factors)
+
+| FACTOR |  | DESCRIPTION |
+| ---------- | ---------- |  
+| repository | - | Github template repository (e.g. https://github.com/tercen/workflow_lib)  |
+| branch | main | Github template repository branch (e.g. main) |
+| version | - | Tag or commit hash string  (e.g. 1.0, blank or commit identifier) |
 
 
     

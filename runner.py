@@ -289,6 +289,11 @@ def run_with_params(params, mode="cli"):
     if mode == "operator":
         return statusList
 
+def tercenBool(value):
+    if value == "true":
+        return True
+    else:
+        return False 
 
 def run(argv):
     params = parse_args(argv)
@@ -305,6 +310,7 @@ def run(argv):
         # wkf = tercenCtx.client.workflowService.get(tercenCtx.get_workflow_id())
         # params["projectId"] = wkf.projectId
 
+        reportMode = tercenCtx.operator_property('Report Mode', typeFn=tercenBool, default=False)
         opMem = tercenCtx.operator_property('Memory', typeFn=int, default=-1)
         gitToken = tercenCtx.operator_property('Github Token', typeFn=str, default="")
         tolerance = tercenCtx.operator_property('Tolerance', typeFn=float, default=0.001)
@@ -326,8 +332,7 @@ def run(argv):
             params["branch"] = df[i,"branch"]
             params["tag"] = df[i,"version"]
             params["gitToken"] = gitToken
-            #FIXME Read this from parameters
-            params["report"] = False
+            params["report"] = reportMode
             params["tolerance"] = tolerance
             params["toleranceType"] = toleranceType.lower()
             # opMem = 500000000

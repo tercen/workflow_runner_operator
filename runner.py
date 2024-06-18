@@ -133,11 +133,14 @@ def run_with_params(params, mode="cli"):
             client = params["client"] # Running as operator
 
         # Create temp project on which to run tests
-        project = Project()
-        project.name = 'template_test_' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
-        project.acl.owner = params['user']
-        project = client.projectService.create(project)
-        params["projectId"] = project.id
+        if mode == "cli":
+            project = Project()
+            project.name = 'template_test_' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
+            project.acl.owner = params['user']
+            project = client.projectService.create(project)
+            params["projectId"] = project.id
+        else:
+            project = tercenCtx.client.projectService.get(params["projectId"])
 
         # Clone the template project from git into the temp project
         importTask = GitProjectTask()
@@ -297,7 +300,8 @@ def run(argv):
                                     #   stepId="1ba15e7c-6c3e-4521-81f2-d19fa58a57b9")
         tercenCtx = ctx.TercenContext()
         params["client"] = tercenCtx.context.client
-  
+        wkf = tercenCtx.client.workflowService.get(tercenCtx.get_workflow_id())
+        params["projectId"] = wkf.projectId
 
         opMem = tercenCtx.operator_property('Memory', typeFn=int, default=-1)
         gitToken = tercenCtx.operator_property('Github Token', typeFn=str, default="")

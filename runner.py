@@ -322,14 +322,12 @@ def run(argv):
         outDf2 = pl.DataFrame()
 
         for i in range(0, nRepos):
-
-            templateRepo = "https://github.com/" + df[i,0]
-            params["templateRepo"] = templateRepo
-            params["branch"] = df[i,1]
-            params["tag"] = df[i,2]
+            params["templateRepo"] = df[i,"repository"]
+            params["branch"] = df[i,"branch"]
+            params["tag"] = df[i,"tag"]
             params["gitToken"] = gitToken
             #FIXME Read this from parameters
-            params["report"] = True
+            params["report"] = False
             params["tolerance"] = tolerance
             params["toleranceType"] = toleranceType.lower()
             # opMem = 500000000

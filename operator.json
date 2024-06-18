@@ -7,6 +7,12 @@
     "container":"tercen/workflow_runner_operator:latest",
     "properties": [
         {
+            "kind": "BooleanProperty",
+            "name": "Report Mode",
+            "defaultValue": false,
+            "description": ""
+        },
+        {
             "kind": "DoubleProperty",
             "name": "Memory",
             "defaultValue": -1,

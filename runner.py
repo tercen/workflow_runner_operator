@@ -135,7 +135,7 @@ def run_with_params(params, mode="cli"):
         # Create temp project on which to run tests
         # if mode == "cli":
         project = Project()
-        project.name = 'template_test_' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
+        project.name = 'WorkflowRunner_' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
         project.acl.owner = params['user']
         project = client.projectService.create(project)
         params["projectId"] = project.id
@@ -283,7 +283,7 @@ def run_with_params(params, mode="cli"):
         raise e
         
     finally:
-        if project != None and client != None and mode == "cli":
+        if project != None and client != None:
             client.workflowService.delete(project.id, project.rev)
 
     if mode == "operator":
@@ -300,6 +300,8 @@ def run(argv):
                                     #   stepId="1ba15e7c-6c3e-4521-81f2-d19fa58a57b9")
         tercenCtx = ctx.TercenContext()
         params["client"] = tercenCtx.context.client
+        task = tercenCtx.client.taskService.get(params["taskId"])
+        params["user"] = task.owner
         # wkf = tercenCtx.client.workflowService.get(tercenCtx.get_workflow_id())
         # params["projectId"] = wkf.projectId
 

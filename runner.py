@@ -140,7 +140,7 @@ def run_with_params(params, mode="cli"):
             project = client.projectService.create(project)
             params["projectId"] = project.id
         else:
-            project = tercenCtx.client.projectService.get(params["projectId"])
+            project = client.projectService.get(params["projectId"])
 
         # Clone the template project from git into the temp project
         importTask = GitProjectTask()

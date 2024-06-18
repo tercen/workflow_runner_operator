@@ -372,15 +372,22 @@ def run(argv):
                                             "mimetype":"application/json",\
                                             ".content":output_str})\
                                 ])
-                    
-        outDf = outDf.with_columns(pl.col('.ci').cast(pl.Int32))\
-                     .with_columns(pl.col('status').cast(pl.Float64))
-        outDf2 = outDf2.with_columns(pl.col('.ci').cast(pl.Int32))\
-                       .with_columns(pl.col('.content').cast(pl.Utf8))
-
-        outDf = tercenCtx.add_namespace(outDf) 
-        outDf2 = tercenCtx.add_namespace(outDf2) 
-        tercenCtx.save([outDf, outDf2])
+                        
+        dfArray = []
+        if not outDf.is_empty():
+            outDf = outDf.with_columns(pl.col('.ci').cast(pl.Int32))\
+                        .with_columns(pl.col('status').cast(pl.Float64))
+            outDf = tercenCtx.add_namespace(outDf) 
+            dfArray.append(outDf)
+            
+        if not outDf2.is_empty():
+            outDf2 = outDf2.with_columns(pl.col('.ci').cast(pl.Int32))\
+                        .with_columns(pl.col('.content').cast(pl.Utf8))
+            outDf2 = tercenCtx.add_namespace(outDf2) 
+            dfArray.append(outDf2)
+        
+        if len(dfArray) > 0:
+            tercenCtx.save(dfArray)
         
     else:
         run_with_params(params)

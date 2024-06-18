@@ -26,7 +26,7 @@ def parse_args(argv):
                                 )
     #python3 /workspaces/workflow_runner/runner.py --templateRepo=tercen/scyan_operator
     #tercen/scyan_operator
-    templateRepo = "tercen/flow_core_immunophenotyping_template" #"tercen/image_analysis_STK_workflowRunner_template" 
+    templateRepo = "tercen/simple_workflow_template" #"tercen/image_analysis_STK_workflowRunner_template" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
@@ -279,9 +279,9 @@ def run_with_params(params, mode="cli"):
 
         raise e
         
-    # finally:
-    #     if project != None and client != None:
-    #         client.workflowService.delete(project.id, project.rev)
+    finally:
+        if project != None and client != None:
+            client.workflowService.delete(project.id, project.rev)
 
     if mode == "operator":
         return statusList

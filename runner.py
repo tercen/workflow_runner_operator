@@ -283,7 +283,7 @@ def run_with_params(params, mode="cli"):
         raise e
         
     finally:
-        if project != None and client != None:
+        if project != None and client != None and mode == "cli":
             client.workflowService.delete(project.id, project.rev)
 
     if mode == "operator":

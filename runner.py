@@ -147,6 +147,11 @@ def run_with_params(params, mode="cli"):
         importTask.owner = params['user']
         importTask.state = InitState()
 
+
+        util.msg( "Template Params", params["verbose"] )
+        util.msg( "Template: {}".format(params["templateRepo"]), params["verbose"] )
+        util.msg( "TAG: {}".format(params["tag"]), params["verbose"] )
+
         importTask.addMeta("PROJECT_ID", project.id)
         importTask.addMeta("PROJECT_REV", project.rev)
         importTask.addMeta("GIT_ACTION", "reset/pull")

@@ -7,7 +7,7 @@ import workflow_funcs.util as util
 from tercen.model.impl import *
 import tercen.util.helper_functions as utl
 import numpy as np
-import tercen.util.helper_functions as utl
+from tercen.util.helper_objects import ObjectTraverser
 import tercen.http.HttpClientService as th
 
 def isnumeric(val):
@@ -269,7 +269,7 @@ def compare_export_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute
 def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", tableComp=[], verbose=False):
     stepResult = {}
 
-
+    
     if(isinstance(stp, DataStep)):
         # If operator is not set, computedRelation will have no joinOperators and nothing to compare
         if hasattr(stp.computedRelation, 'joinOperators'):
@@ -310,10 +310,15 @@ def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", tabl
                                 k+1 )
                     k = k + 1
                     continue
-
-                idList = get_simple_relation_id_list(jop.rightRelation)
-                refIdList = get_simple_relation_id_list(refJop.rightRelation)
-
+                # idList = get_simple_relation_id_list(jop.rightRelation)
+                # refIdList = get_simple_relation_id_list(refJop.rightRelation)
+                traverser = ObjectTraverser()
+                relList = traverser.traverse( jop.rightRelation, SimpleRelation )
+                idList = [rel.id for rel in relList]
+                
+                traverser = ObjectTraverser()
+                relList = traverser.traverse( refJop.rightRelation, SimpleRelation )
+                refIdList = [rel.id for rel in relList]
                 if len(idList) != len(refIdList):
                             stpRes["NumTables"] = "Number of Relations in JoinOperator {} \
                                 do not match: {:d} x {:d} (GoldenStandard vs Template)".format(

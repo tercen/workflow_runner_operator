@@ -24,13 +24,11 @@ def parse_args(argv):
                                 "serviceUri=", "user=", "passw=", "token=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
-    #python3 /workspaces/workflow_runner/runner.py --templateRepo=tercen/scyan_operator
-    #tercen/scyan_operator
-    templateRepo = "tercen/simple_workflow_template" #"tercen/image_analysis_STK_workflowRunner_template" 
+    templateRepo ="tercen/image_analysis_STK_workflowRunner_template" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
-    params["opMem"] = None #"1000000000" 
+    params["opMem"] = None #"5000000000" 
 
     params["user"] = 'test'
     params["passw"] = 'test'
@@ -159,7 +157,8 @@ def run_with_params(params, mode="cli"):
         importTask.addMeta("GIT_URL", params["templateRepo"])
         importTask.addMeta("GIT_BRANCH",params["branch"])
         importTask.addMeta("GIT_MESSAGE", "")
-        importTask.addMeta("GIT_TAG", params["tag"])
+        if params["tag"] != "":
+            importTask.addMeta("GIT_TAG", params["tag"])
 
         importTask = client.taskService.create(importTask)
         client.taskService.runTask(importTask.id)

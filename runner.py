@@ -24,11 +24,11 @@ def parse_args(argv):
                                 "serviceUri=", "user=", "passw=", "token=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
-    templateRepo ="tercen/image_analysis_STK_workflowRunner_template" 
+    templateRepo ="tercen/kumo_umap_apply_operator" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
-    params["opMem"] = None #"5000000000" 
+    params["opMem"] = "5000000000" 
 
     params["user"] = 'test'
     params["passw"] = 'test'
@@ -286,9 +286,9 @@ def run_with_params(params, mode="cli"):
 
         raise e
         
-    finally:
-        if project != None and client != None:
-            client.workflowService.delete(project.id, project.rev)
+    # finally:
+        # if project != None and client != None:
+            # client.workflowService.delete(project.id, project.rev)
 
     if mode == "operator":
         return statusList

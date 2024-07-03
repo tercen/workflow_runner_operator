@@ -71,13 +71,13 @@ def parse_args(argv):
             params["templateFolder"] = arg
 
         if opt == '--user':
-            if arg == "":
+            if arg is None or arg == "":
                 params["user"] = "test"
             else:
                 params["user"] = arg
         
         if opt == '--passw':
-            if arg == "":
+            if arg is None or arg == "":
                 params["passw"] = "test"
             else:
                 params["passw"] = arg

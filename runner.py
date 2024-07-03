@@ -24,11 +24,11 @@ def parse_args(argv):
                                 "serviceUri=", "user=", "passw=", "token=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
-    templateRepo ="tercen/kumo_umap_apply_operator" 
+    templateRepo ="tercen/simple_workflow_template" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
-    params["opMem"] = "5000000000" 
+    params["opMem"] = None #"5000000000" 
 
     params["user"] = 'test'
     params["passw"] = 'test'
@@ -71,10 +71,16 @@ def parse_args(argv):
             params["templateFolder"] = arg
 
         if opt == '--user':
-            params["user"] = arg
+            if arg == "":
+                params["user"] = "test"
+            else:
+                params["user"] = arg
         
         if opt == '--passw':
-            params["passw"] = arg
+            if arg == "":
+                params["passw"] = "test"
+            else:
+                params["passw"] = arg
         
         if opt == '--token':
             params["token"] = arg
@@ -242,7 +248,7 @@ def run_with_params(params, mode="cli"):
                             "result":resultDict})
                         allPass = False
                     else:
-                        if isinstance(resultDict, dict):
+                        if isinstance(resultDict, dict) or isinstance(resultDict, list):
                             with open('test_results.json', 'w', encoding='utf-8') as f:
                                 json.dump(resultDict, f, ensure_ascii=False, indent=4)
                         else:

@@ -62,7 +62,10 @@ def parse_args(argv):
             gitToken = arg
 
         if opt == '--serviceUri':
-            params["serviceUri"] = arg
+            if arg is None or arg == "":
+                params["serviceUri"] = "http://127.0.0.1:5400"
+            else:
+                params["serviceUri"] = arg
 
         if opt == '--opMem':
             params["opMem"] = arg

@@ -20,15 +20,15 @@ def parse_args(argv):
     opts, args = getopt.getopt(argv,"",
                                ["templateRepo=", "gitToken=", "tag=", "branch=",
                                 "update_operator", "quiet", "report", "opMem=",
-                                "templateFolder=", \
+                                "templateFolder=", "hidden_columns", \
                                 "serviceUri=", "user=", "passw=", "token=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
-    templateRepo ="tercen/simple_workflow_template" 
+    templateRepo ="tercen/kumo_model_train_operator" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
-    params["opMem"] = None #"5000000000" 
+    params["opMem"] = "5000000000" 
 
     params["user"] = 'test'
     params["passw"] = 'test'
@@ -40,6 +40,7 @@ def parse_args(argv):
     params["report"] = False
     params["tolerance"] = 0.001
     params["toleranceType"] = "relative"
+    params["hidden_columns"] = False
 
     params["templateFolder"] = "workflow_tests" #None
 
@@ -103,6 +104,9 @@ def parse_args(argv):
 
         if opt == '--quiet':
             params["verbose"] = False
+        
+        if opt == '--hidden_columns':
+            params["hidden_columns"] = True
 
         if opt == '--taskId':
             params["taskId"] = arg
@@ -235,7 +239,7 @@ def run_with_params(params, mode="cli"):
 
                 util.msg("Comparing Results", verbose)
                 resultDict = workflow_compare.diff_workflow(client, workflowRun, gsWkf,  params["tolerance"],
-                                        params["toleranceType"], verbose)
+                                        params["toleranceType"], params["hidden_columns"], verbose)
 
 
                 if resultDict != None and resultDict != []:

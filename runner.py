@@ -71,6 +71,7 @@ def parse_args(argv):
             params["templateFolder"] = arg
 
         if opt == '--user':
+            util.msg("[INFO] Running wokflow as USER {}".format(arg), verbose=True)
             if arg is None or arg == "":
                 params["user"] = "test"
             else:

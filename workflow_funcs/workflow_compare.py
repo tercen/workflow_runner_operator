@@ -130,8 +130,8 @@ def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="absolute
             util.msg("Comparing {} against {}".format(colNames[ci], refColNames[ci]), verbose=verbose)
             col = th.decodeTSON(client.tableSchemaService.selectStream(schema.id, [colNames[ci]], 0, -1))
             refCol = th.decodeTSON(client.tableSchemaService.selectStream(refSchema.id, [refColNames[ci]], 0, -1))
-            colVals = col["columns"][0]["values"]
-            refColVals = refCol["columns"][0]["values"]
+            colVals = list(col["columns"][0]["values"])
+            refColVals = list(refCol["columns"][0]["values"])
 
 
 

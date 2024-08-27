@@ -224,7 +224,10 @@ def run_with_params(params, mode="cli"):
                     util.msg( "Config file detected for workflow", verbose )
                     break
             
-
+            exclude = []
+            if "config" in params and "EXCLUDE" in params["config"]:
+                exclude = params["config"]["EXCLUDE"].split(",")
+            
             gsList = util.filter_by_golden_standard( workflowList, wkfName)
 
             wkf = w
@@ -246,7 +249,7 @@ def run_with_params(params, mode="cli"):
 
                 util.msg("Comparing Results", verbose)
                 resultDict = workflow_compare.diff_workflow(client, workflowRun, gsWkf,  params["tolerance"],
-                                        params["toleranceType"], params["hidden_columns"], verbose, exclude=params["exclude_columns"])
+                                        params["toleranceType"], params["hidden_columns"], verbose, exclude=exclude)
 
 
                 if resultDict != None and resultDict != []:

@@ -89,7 +89,7 @@ def get_simple_relation_id_list(obj):
     return idList
 
 
-def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="absolute", hiddenColumns=False, verbose=False):
+def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="absolute", hiddenColumns=False, exclude=[], verbose=False):
     tableRes = {}
     hasDiff = False
 
@@ -102,13 +102,15 @@ def compare_schema(client, tableIdx, schema, refSchema, tol=0, tolType="absolute
     refColNames = []
     
     for name in colNamesIn:
-        if not name.startswith(".") or hiddenColumns == True:
-            colNames.append(name)
+        if not name in exclude:
+            if not name.startswith(".") or hiddenColumns == True:
+                colNames.append(name)
     
     
     for name in refColNamesIn:
-        if not name.startswith(".") or hiddenColumns == True:
-            refColNames.append(name)
+        if not name in exclude:
+            if not name.startswith(".") or hiddenColumns == True:
+                refColNames.append(name)
     res = compare_columns_metadata(colNames, refColNames)
 
     if len(res) > 0:
@@ -276,7 +278,7 @@ def compare_export_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute
 
 
 
-def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", hiddenColumns=False, verbose=False):
+def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", hiddenColumns=False, exclude=[], verbose=False,):
     stepResult = {}
 
     
@@ -338,7 +340,7 @@ def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", hidd
                         schema = client.tableSchemaService.get(idList[k])
                         refSchema = client.tableSchemaService.get(refIdList[k])
                         
-                        res = compare_schema(client, w, schema, refSchema,  tol, tolType=tolType, hiddenColumns=hiddenColumns)
+                        res = compare_schema(client, w, schema, refSchema,  tol, tolType=tolType, hiddenColumns=hiddenColumns, exclude=exclude)
                         tableRes = res[0]
                         hasDiff = res[1]
 
@@ -352,7 +354,7 @@ def compare_step(client, tableIdx, stp, refStp,  tol=0, tolType="absolute", hidd
 
     return stepResult
 
-def diff_workflow(client, workflow, refWorkflow,  tol=0, tolType="absolute", hiddenColumns=False, verbose=False):
+def diff_workflow(client, workflow, refWorkflow,  tol=0, tolType="absolute", hiddenColumns=False, verbose=False, exclude=[]):
     resultDict = []
 
     if len(workflow.steps) != len(refWorkflow.steps):
@@ -365,7 +367,7 @@ def diff_workflow(client, workflow, refWorkflow,  tol=0, tolType="absolute", hid
             refStp = refWorkflow.steps[i]
 
             if isinstance(stp.state.taskState, DoneState) and isinstance(refStp.state.taskState, DoneState):
-                stepRes = compare_step(client, i, stp, refStp,  tol, tolType, hiddenColumns)
+                stepRes = compare_step(client, i, stp, refStp,  tol, tolType, hiddenColumns, exclude=exclude)
 
                 if len(stepRes) > 0:
                     resultDict.append(stepRes)

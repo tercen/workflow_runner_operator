@@ -41,6 +41,8 @@ def parse_args(argv):
     params["tolerance"] = 0.001
     params["toleranceType"] = "relative"
     params["hidden_columns"] = False
+    
+    params["exclude_columns"] = []
 
     params["templateFolder"] = "workflow_tests" #None
 
@@ -98,6 +100,9 @@ def parse_args(argv):
 
         if opt == '--tag':
             params["tag"] = arg
+            
+        if opt == '--exclude':
+            params["exclude_columns"] = arg.split(",")
 
         if opt == '--branch':
             params["branch"] = arg
@@ -126,6 +131,8 @@ def parse_args(argv):
         gitToken = os.environ["GITHUB_TOKEN"]
 
     params["gitToken"] = gitToken
+
+
 
     return params
 
@@ -239,7 +246,7 @@ def run_with_params(params, mode="cli"):
 
                 util.msg("Comparing Results", verbose)
                 resultDict = workflow_compare.diff_workflow(client, workflowRun, gsWkf,  params["tolerance"],
-                                        params["toleranceType"], params["hidden_columns"], verbose)
+                                        params["toleranceType"], params["hidden_columns"], verbose, exclude=params["exclude_columns"])
 
 
                 if resultDict != None and resultDict != []:
@@ -326,16 +333,7 @@ def fixDictTypes(dictObj):
                 o = float(o)
             dictObj[i] = o
                 
-                
-            # elif(isinstance(v, np.ndarray)):
-            #     print("{} is ndarray".format(k))
-            #     if( v.dtype == np.int32 ):
-            #         print("{}".format(k))
-            #         v = float(v.tolist())
-            #     else:
-            #         v = v.tolist()
-            #     o[k] = v
-                    
+                   
     else:
         for k, v in dictObj.items():
             if isinstance(v, dict)  or isinstance(v, list):

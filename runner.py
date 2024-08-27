@@ -226,8 +226,9 @@ def run_with_params(params, mode="cli"):
             
             exclude = []
             if "config" in params and "EXCLUDE" in params["config"]:
-                exclude = params["config"]["EXCLUDE"].split(",")
+                exclude = params["config"]["EXCLUDE"].replace("\r", "").replace("\n", "").split(",")
             
+
             gsList = util.filter_by_golden_standard( workflowList, wkfName)
 
             wkf = w

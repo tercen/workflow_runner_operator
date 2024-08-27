@@ -258,7 +258,7 @@ def run_with_params(params, mode="cli"):
                     else:
                         if isinstance(resultDict, dict) or isinstance(resultDict, list):
                             with open('test_results.json', 'w', encoding='utf-8') as f:
-                                json.dump(resultDict, f, ensure_ascii=False, indent=4)
+                                json.dump(fixDictTypes(resultDict), f, ensure_ascii=False, indent=4)
                         else:
                             with open('test_results.json', "w") as f:
                                 for line in resultDict:
@@ -306,6 +306,26 @@ def run_with_params(params, mode="cli"):
 
     if mode == "operator":
         return statusList
+
+import numpy as np
+from typing import cast
+def fixDictTypes(dictObj):
+    if isinstance(dictObj, list):
+        for o in dictObj.items():
+            for k, v in o:
+                if isinstance(v, dict):
+                    fixDictTypes(v)
+                elif(isinstance(v, np.ndarray)):
+                    v = cast( np.array, v).tolist()
+    else:
+        for k, v in dictObj.items():
+            if isinstance(v, dict):
+                fixDictTypes(v)
+            elif(isinstance(v, np.ndarray)):
+                v = cast( np.array, v).tolist()
+                
+    return dictObj
+            
 
 def tercenBool(value):
     if value == "true":

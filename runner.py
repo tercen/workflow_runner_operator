@@ -24,7 +24,7 @@ def parse_args(argv):
                                 "serviceUri=", "user=", "passw=", "token=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
-    templateRepo ="tercen/kumo_model_train_operator" 
+    templateRepo ="tercen/kumo_data_prep_operator" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
@@ -256,6 +256,7 @@ def run_with_params(params, mode="cli"):
                             "result":resultDict})
                         allPass = False
                     else:
+
                         if isinstance(resultDict, dict) or isinstance(resultDict, list):
                             with open('test_results.json', 'w', encoding='utf-8') as f:
                                 json.dump(fixDictTypes(resultDict), f, ensure_ascii=False, indent=4)
@@ -309,20 +310,43 @@ def run_with_params(params, mode="cli"):
 
 import numpy as np
 from typing import cast
+
 def fixDictTypes(dictObj):
+
     if isinstance(dictObj, list):
-        for o in dictObj.items():
-            for k, v in o:
-                if isinstance(v, dict):
-                    fixDictTypes(v)
-                elif(isinstance(v, np.ndarray)):
-                    v = cast( np.array, v).tolist()
+        
+        # for o in dictObj:
+        for i in range(len(dictObj)):
+            o = dictObj[i]
+            if isinstance(o, dict) or isinstance(o, list):
+                o = fixDictTypes(o)
+            elif( type(o) == np.int32 or type(o) == np.int64 ):
+                o = int(o)
+            elif( type(o) == np.float64 or type(o) == np.float32):
+                o = float(o)
+            dictObj[i] = o
+                
+                
+            # elif(isinstance(v, np.ndarray)):
+            #     print("{} is ndarray".format(k))
+            #     if( v.dtype == np.int32 ):
+            #         print("{}".format(k))
+            #         v = float(v.tolist())
+            #     else:
+            #         v = v.tolist()
+            #     o[k] = v
+                    
     else:
         for k, v in dictObj.items():
-            if isinstance(v, dict):
-                fixDictTypes(v)
+            if isinstance(v, dict)  or isinstance(v, list):
+                dictObj[k] = fixDictTypes(v)
             elif(isinstance(v, np.ndarray)):
-                v = cast( np.array, v).tolist()
+                
+                if( v.dtype == np.int32 ):
+                    v = float(v.tolist())
+                else:
+                    v = v.tolist()
+                dictObj[k]=v
                 
     return dictObj
             

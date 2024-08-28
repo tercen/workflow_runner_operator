@@ -24,7 +24,7 @@ def parse_args(argv):
                                 "serviceUri=", "user=", "passw=", "token=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
-    templateRepo ="tercen/kumo_data_prep_operator" 
+    templateRepo ="tercen/kumo_umap_operator" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
@@ -225,7 +225,7 @@ def run_with_params(params, mode="cli"):
                     break
             
             exclude = []
-            if "config" in params and "EXCLUDE" in params["config"]:
+            if "config" in params and not params["config"] is None and "EXCLUDE" in params["config"]:
                 exclude = params["config"]["EXCLUDE"].replace("\r", "").replace("\n", "").split(",")
             
 

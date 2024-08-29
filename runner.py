@@ -21,6 +21,7 @@ def parse_args(argv):
                                ["templateRepo=", "gitToken=", "tag=", "branch=",
                                 "update_operator", "quiet", "report", "opMem=",
                                 "templateFolder=", "hidden_columns", \
+                                "printReport", \
                                 "serviceUri=", "user=", "passw=", "token=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
@@ -43,7 +44,7 @@ def parse_args(argv):
     params["hidden_columns"] = False
     params["print_log"] = False
     
-    params["exclude_columns"] = []
+
 
     params["templateFolder"] = "workflow_tests" #None
 

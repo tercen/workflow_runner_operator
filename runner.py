@@ -24,7 +24,7 @@ def parse_args(argv):
                                 "serviceUri=", "user=", "passw=", "token=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
-    templateRepo ="tercen/kumo_umap_operator" 
+    templateRepo ="tercen/kumo_data_prep_operator" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
@@ -41,6 +41,7 @@ def parse_args(argv):
     params["tolerance"] = 0.001
     params["toleranceType"] = "relative"
     params["hidden_columns"] = False
+    params["print_log"] = False
     
     params["exclude_columns"] = []
 
@@ -72,6 +73,9 @@ def parse_args(argv):
 
         if opt == '--opMem':
             params["opMem"] = arg
+
+        if opt == '--printReport':
+            params["print_log"] = True
 
         if opt == '--templateFolder':
             params["templateFolder"] = arg
@@ -253,7 +257,14 @@ def run_with_params(params, mode="cli"):
                                         params["toleranceType"], params["hidden_columns"], verbose, exclude=exclude)
 
 
+  
                 if resultDict != None and resultDict != []:
+                    if( params["print_log"] == True ):
+                        print(json.dumps(
+                            resultDict,
+                            sort_keys=True,
+                            indent=4,
+                            separators=(',', ': ')))
                     if params["report"] == True:
                         resultDict = {w2.name: resultDict[0]}
                         resultList = {**resultList, **resultDict}

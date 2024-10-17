@@ -4,7 +4,7 @@
     "tags": ["workflow"],
     "authors": ["tercen"],
     "urls": ["https://github.com/tercen/workflow_runner_operator"],
-    "container":"tercen/workflow_runner_operator:latest",
+    "container":"ghcr.io/tercen/workflow_runner_operator:latest",
     "properties": [
         {
             "kind": "BooleanProperty",

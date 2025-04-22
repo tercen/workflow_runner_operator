@@ -15,6 +15,32 @@ from datetime import datetime
 
 from workflow_funcs.util import filter_by_type
 
+
+def install_operator(opUrl:str, opVersion:str, params:dict, client, opName:str=None, verbose:bool=True):
+    if opName is None or opName == "":
+        opName = opUrl
+    util.msg("Installing {}:{} from {}".format(opName, opVersion, opUrl), verbose)
+    installTask = CreateGitOperatorTask()
+    installTask.state = InitState()
+    installTask.url.uri = opUrl
+    installTask.version = opVersion
+    installTask.gitToken = params["gitToken"]
+    
+    installTask.testRequired = False
+    installTask.isDeleted = False
+    installTask.owner = params["user"]
+
+    installTask = client.taskService.create(installTask)
+    client.taskService.runTask(installTask.id)
+    installTask = client.taskService.waitDone(installTask.id)
+
+    if isinstance(installTask.state, DoneState):
+        operator = client.operatorService.get(installTask.operatorId)
+    else:
+        raise RuntimeError("Installation of operator " + opVersion + " failed. USER: " + params["user"]) 
+    
+    return operator
+
 def get_installed_operator(client,  opName, opUrl, opVersion, params, verbose=False):
     installedOperators = client.documentService.findOperatorByOwnerLastModifiedDate(params['user'], '')
     opTag = '{}@{}@{}'.format(opName, opUrl, opVersion)
@@ -25,25 +51,7 @@ def get_installed_operator(client,  opName, opUrl, opVersion, params, verbose=Fa
     
     if not np.any(comp):
         # install the operator
-        util.msg("Installing {}:{} from {}".format(opName, opVersion, opUrl), verbose)
-        installTask = CreateGitOperatorTask()
-        installTask.state = InitState()
-        installTask.url.uri = opUrl
-        installTask.version = opVersion
-        installTask.gitToken = params["gitToken"]
-        
-        installTask.testRequired = False
-        installTask.isDeleted = False
-        installTask.owner = params["user"]
-
-        installTask = client.taskService.create(installTask)
-        client.taskService.runTask(installTask.id)
-        installTask = client.taskService.waitDone(installTask.id)
-
-        if isinstance(installTask.state, DoneState):
-            operator = client.operatorService.get(installTask.operatorId)
-        else:
-            raise RuntimeError("Installation of operator " + opTag + " failed. USER: " + params["user"]) 
+        operator = install_operator(opUrl, opVersion, params, client, opName=opName, verbose=verbose)
     else:
         idx = util.which(comp)
         if isinstance(idx, list):
@@ -53,6 +61,24 @@ def get_installed_operator(client,  opName, opUrl, opVersion, params, verbose=Fa
 
     return operator
     
+
+
+def setup_operator_version( workflow, client, params):
+    for stpIdx in range(0, len(workflow.steps)):
+        if hasattr(workflow.steps[stpIdx].model, "operatorSettings"):
+            stepName = workflow.steps[stpIdx].name
+            stepId = workflow.steps[stpIdx].id
+            # workflowOperatorUrl = workflow.steps[stpIdx].model.operatorSettings.operatorRef.url 
+            if stepName == params["operatorStep"] or stepId == params["operatorStep"]:
+                newOp = install_operator(params["operatorUrl"], params["operatorVersion"], params, client)
+                workflow.steps[stpIdx].model.operatorSettings.operatorRef.operatorId = newOp.id
+                workflow.steps[stpIdx].model.operatorSettings.operatorRef.name = newOp.name
+                workflow.steps[stpIdx].model.operatorSettings.operatorRef.url = newOp.url
+                workflow.steps[stpIdx].model.operatorSettings.operatorRef.version = newOp.version
+
+    return workflow
+
+
 def update_operators( workflow, client, params):
     
     operatorLib = client.documentService.getTercenOperatorLibrary(0, 300)
@@ -98,6 +124,9 @@ def setup_workflow(client, templateWkf, gsWkf, params):
     workflow.name = "{}_{}".format(templateWkf.name, datetime.now().strftime("%Y%m%d_%H%M%S"))
     workflow.id = ''
 
+
+    if "operatorUrl" in params:
+        workflow = setup_operator_version( workflow, client, params )
 
     if params["update_operator"] == True:
         util.msg("Checking for updated operator versions", params["verbose"])

@@ -22,10 +22,11 @@ def parse_args(argv):
                                 "update_operator", "quiet", "report", "opMem=",
                                 "templateFolder=", "hidden_columns", \
                                 "printReport", \
+                                "operatorUrl=", "operatorVersion=", "operatorStep=", \
                                 "serviceUri=", "user=", "passw=", "token=",
                                  "tolerance=", "toleranceType=", "taskId=" ]
                                 )
-    templateRepo ="tercen/kumo_data_prep_operator" 
+    templateRepo ="tercen/kumo_model_train_operator" 
 
     # If running locally or creating new operator, memory might no be set
     # This parameter sets the memory for ALL operators
@@ -42,7 +43,7 @@ def parse_args(argv):
     params["tolerance"] = 0.001
     params["toleranceType"] = "relative"
     params["hidden_columns"] = False
-    params["print_log"] = False
+    params["print_log"] = True #False
     
 
 
@@ -112,6 +113,15 @@ def parse_args(argv):
         if opt == '--branch':
             params["branch"] = arg
 
+        if opt == '--operatorUrl':
+            params["operatorUrl"] = arg
+
+        if opt == '--operatorVersion':
+            params["operatorVersion"] = arg
+
+        if opt == '--operatorStep':
+            params["operatorStep"] = arg
+
         if opt == '--quiet':
             params["verbose"] = False
         
@@ -131,6 +141,7 @@ def parse_args(argv):
     templateRepo = "https://github.com/" + templateRepo
 
     params["templateRepo"] = templateRepo
+    params["operatorUrl"] = "https://github.com/" + params["operatorUrl"]
         
     if gitToken == None and "GITHUB_TOKEN" in os.environ:
         gitToken = os.environ["GITHUB_TOKEN"]
@@ -190,7 +201,7 @@ def run_with_params(params, mode="cli"):
         client.taskService.runTask(importTask.id)
         importTask = client.taskService.waitDone(importTask.id)
         
-
+        #FIXME Non-desirable call. Cahnge to query the library for workflow obejcts
         objs = client.persistentService.getDependentObjects(project.id)
         workflowList = util.filter_by_type(objs, Workflow)
         # fileList is retrieved to search for configuration files, if any
